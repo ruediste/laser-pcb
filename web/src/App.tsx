@@ -9,6 +9,7 @@ import {
 } from 'react-router-dom';
 import Profile from './Profile';
 import Process from './Process';
+import Control from './Control';
 import { ToastContainer } from 'react-toastify';
 
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,6 +23,7 @@ interface NavEntry {
 let navEntries: NavEntry[] = [
   { title: 'Profile', path: '/profile', component: Profile },
   { title: 'Process', path: '/process', component: Process },
+  { title: 'Control', path: '/control', component: Control },
 ];
 
 function Navigation() {

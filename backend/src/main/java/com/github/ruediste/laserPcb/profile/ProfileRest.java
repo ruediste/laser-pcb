@@ -17,14 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.github.ruediste.laserPcb.CncCommunicationAppController;
-
 @RestController
 public class ProfileRest {
 	private final Logger logger = LoggerFactory.getLogger(ProfileRest.class);
-
-	@Autowired
-	CncCommunicationAppController appCtrl;
 
 	@Autowired
 	ProfileRepository repo;
@@ -83,37 +78,6 @@ public class ProfileRest {
 		profile.id = null;
 		repo.save(profile);
 		return new ProfileList(profile);
-	}
-
-	@PostMapping("/galvo/{axis}")
-	void setAxisValue(@PathVariable String axis, @RequestParam int value) {
-		logger.info("setValue of " + axis + " to " + value);
-		if ("x".equalsIgnoreCase(axis))
-			appCtrl.set(0, value);
-		else if ("y".equalsIgnoreCase(axis))
-			appCtrl.set(1, value);
-		else
-			throw new RuntimeException("Unknown axis " + axis);
-	}
-
-	@PostMapping("/motor/stop")
-	void stopMotor() {
-		logger.info("Stopping Motor");
-		appCtrl.sendBytes(new byte[] { 0x10 });
-	}
-
-	@PostMapping("/motor/start")
-	void startMotor() {
-		logger.info("Starting Motor");
-		appCtrl.sendBytes(new byte[] { 0x11 });
-	}
-
-	@PostMapping("/motor/stepDelay")
-	void setMotorStepDelay(@RequestParam int value) {
-		logger.info("Setting Motor Step delay to {}", value);
-		appCtrl.sendBytes(new byte[] { 0x12, (byte) (value & 0xFF), (byte) ((value >> 8) & 0xFF),
-				(byte) ((value >> 16) & 0xFF), (byte) ((value >> 24) & 0xFF) });
-
 	}
 
 }

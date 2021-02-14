@@ -27,8 +27,12 @@ public class SingletonRepositoryBase<T> {
 	@SuppressWarnings("unchecked")
 	@PostConstruct
 	private void init() {
+		String name = getClass().getSimpleName();
+		if (name.endsWith("Repository"))
+			name = name.substring(0, name.length() - "Repository".length());
+		name = name.substring(0, 1).toLowerCase() + name.substring(1);
+		path = dataDirService.getDataDir().resolve(name);
 		cls = (Class<T>) RepositoryBase.getFirstSuperClassTypeParameter(getClass());
-		path = dataDirService.getDataDir().resolve(RepositoryBase.getSimpleNameLowerCamel(cls));
 		reload();
 	}
 

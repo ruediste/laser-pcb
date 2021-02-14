@@ -4,6 +4,7 @@ import { request, post, useRefreshTrigger } from './useData';
 import { toast } from 'react-toastify';
 import Select from 'react-dropdown-select';
 import { Row, Col, Button } from 'react-bootstrap';
+import { InputCheck } from './Inputs';
 
 interface EditFunctions<T> {
     update(value: Partial<T>): void;
@@ -43,13 +44,16 @@ function useEdit<T>(url?: string): [T | undefined, EditFunctions<T>] {
 interface Profile {
     id: string;
     name: string;
+    singleLayerPcb: boolean;
 }
+
+
 
 export default function ProfileComponent() {
     const [selectedProfile, setSelectedProfile] = useState<Profile[]>([]);
     const [profile, editProfile] = useEdit<Profile>(selectedProfile.length === 0 ? undefined : 'profile/' + selectedProfile[0].id);
     const profilesRefreshTrigger = useRefreshTrigger();
-    useEffect(() => request('profile/current').success(profile => {if (profile !== null) setSelectedProfile([profile])}).send(), []);
+    useEffect(() => request('profile/current').success(profile => { if (profile !== null) setSelectedProfile([profile]) }).send(), []);
     return <React.Fragment>
         <h1> Profile </h1>
         <div className="container-fluid">
@@ -57,8 +61,9 @@ export default function ProfileComponent() {
             <WithData<Profile[]> url="profile" trigger={profilesRefreshTrigger} render={(data, trigger) =>
                 <Row>
                     <Col>
-                        <Select options={data} values={selectedProfile} onChange={value=>{setSelectedProfile(value); 
-                        if (value.length>0) post('profile/current').query({id:value[0].id}).send();
+                        <Select options={data} values={selectedProfile} onChange={value => {
+                            setSelectedProfile(value);
+                            if (value.length > 0) post('profile/current').query({ id: value[0].id }).send();
                         }} labelField="name" valueField="id" />
                     </Col>
                     <Col>
@@ -73,6 +78,7 @@ export default function ProfileComponent() {
             {profile === undefined ? null : <React.Fragment>
                 <Button onClick={() => editProfile.save(() => { profilesRefreshTrigger.trigger(); setSelectedProfile([profile]) })}>Save</Button>
                 <input type="text" className="form-control" placeholder="Profile Name" value={profile.name} onChange={e => editProfile.update({ name: e.target.value })} />
+                <InputCheck label="Single Layer PCB" value={profile.singleLayerPcb } onChange={value => editProfile.update({ singleLayerPcb: value})}/>
             </React.Fragment>}
         </div>
     </React.Fragment>

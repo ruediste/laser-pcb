@@ -1,4 +1,4 @@
-package com.github.ruediste.laserPcb;
+package com.github.ruediste.laserPcb.cnc;
 
 import static jtermios.JTermios.B115200;
 import static jtermios.JTermios.CLOCAL;
@@ -33,6 +33,7 @@ import static jtermios.JTermios.newFDSet;
 import static jtermios.JTermios.open;
 import static jtermios.JTermios.read;
 import static jtermios.JTermios.select;
+import static jtermios.JTermios.tcdrain;
 import static jtermios.JTermios.tcflush;
 import static jtermios.JTermios.tcgetattr;
 import static jtermios.JTermios.tcsetattr;
@@ -48,30 +49,30 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Service;
 
 import jtermios.JTermios;
 import jtermios.JTermios.FDSet;
 import jtermios.Termios;
 import jtermios.TimeVal;
 
-@Service
-@Scope("singleton")
-public class CncCommunicationAppController {
+public class SerialConnection {
 
-	private final Logger logger = LoggerFactory.getLogger(CncCommunicationAppController.class);
+	private final Logger logger = LoggerFactory.getLogger(SerialConnection.class);
 
 	private int fd;
-
-	private Thread readerThread;
 
 	private volatile boolean closing;
 	private CountDownLatch closed = new CountDownLatch(1);
 
-//	@PostConstruct
-	public void init() {
-		String port = "/dev/ttyUSB0";
+	private PipedOutputStream out;
+
+	public PipedInputStream in;
+
+	public final String port;
+
+	public SerialConnection(String port) {
+		this.port = port;
+		// String port = "/dev/ttyUSB0";
 		logger.info("Opening {}", port);
 		fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
 		if (fd == -1)
@@ -101,35 +102,18 @@ public class CncCommunicationAppController {
 
 		logger.info("Port {} opened", port);
 
-		readerThread = new Thread(this::readLoop, "serialReader");
-		readerThread.start();
-
 		out = new PipedOutputStream();
 		try {
-			in = new PipedInputStream(out, 1024);
+			in = new PipedInputStream(out, 2048);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 
-//		new Thread(() -> {
-//			try {
-//				while (true) {
-//					set(0, 0);
-//					Thread.sleep(1000);
-//					set(0, 255);
-//					Thread.sleep(1000);
-//				}
-//			} catch (Throwable t) {
-//				logger.error("error", t);
-//			}
-//		}).start();
+		new Thread(this::readLoop, "serialReader " + port).start();
 	}
 
-	PipedOutputStream out;
-	PipedInputStream in;
-
 	private void readLoop() {
-		logger.info("Starting to read from serial port");
+		logger.info("Starting to read from serial port {}", port);
 		try {
 			FDSet rdset = newFDSet();
 			FD_ZERO(rdset);
@@ -150,7 +134,7 @@ public class CncCommunicationAppController {
 					throw new RuntimeException("read() failed ");
 				}
 				if (m > 0) {
-					logger.info("received {}", hexDump(buffer, 0, m));
+					logger.debug("received {}", hexDump(buffer, 0, m));
 					out.write(buffer, 0, m);
 				}
 				if (closing) {
@@ -158,15 +142,15 @@ public class CncCommunicationAppController {
 				}
 			}
 		} catch (Throwable t) {
-			logger.error("Error in read loop", t);
+			logger.error("Error in read loop of port " + port, t);
 		}
 		closed.countDown();
-		logger.info("reading from serial port stopped");
+		logger.info("reading from serial port {} stopped", port);
 	}
 
 	private static String hexChars = "0123456789ABCDEF";
 
-	private String hexDump(byte[] buffer, int offset, int len) {
+	public static String hexDump(byte[] buffer, int offset, int len) {
 		StringBuilder sbHex = new StringBuilder();
 		StringBuilder sbAscii = new StringBuilder();
 		for (int idx = offset; idx < offset + len; idx++) {
@@ -182,7 +166,6 @@ public class CncCommunicationAppController {
 		return sbHex.toString() + "   " + sbAscii.toString();
 	}
 
-//	@PreDestroy
 	public void close() {
 		closing = true;
 		try {
@@ -192,14 +175,8 @@ public class CncCommunicationAppController {
 			throw new RuntimeException(e);
 		}
 		int ec = JTermios.close(fd);
-	}
-
-	public void set(int channel, int value) {
-		logger.info("Setting channel {} to {}", channel, value);
-		byte[] tx = new byte[2];
-		tx[0] = (byte) (0b0000 + channel);
-		tx[1] = (byte) value;
-		sendBytes(tx);
+		if (ec < 0)
+			throw new RuntimeException("Error while closing port " + port + " error code: " + ec);
 	}
 
 	public void sendBytes(byte[] tx) {
@@ -213,7 +190,8 @@ public class CncCommunicationAppController {
 			if (l >= tx.length)
 				break;
 		}
-		logger.info("Sending {} complete", hexDump(tx, 0, tx.length));
+		tcdrain(fd);
+		logger.debug("Sending {} complete", hexDump(tx, 0, tx.length));
 	}
 
 }
