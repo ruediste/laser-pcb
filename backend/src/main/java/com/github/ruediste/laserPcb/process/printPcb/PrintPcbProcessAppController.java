@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Shape;
+import java.awt.geom.Arc2D;
 import java.awt.geom.Rectangle2D;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -21,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -31,7 +34,12 @@ import org.jfree.svg.SVGGraphics2D;
 import org.jfree.svg.ViewBox;
 import org.locationtech.jts.awt.ShapeWriter;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.operation.overlay.OverlayOp;
+import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,12 +88,14 @@ public class PrintPcbProcessAppController {
 		ArrayList<CompletableFuture<?>> tasks = new ArrayList<>();
 		processAppCtrl.update(process -> {
 			if (process.printPcb != null) {
+				process.printPcb.status = PrintPcbStatus.INITIAL;
 				for (var file : process.printPcb.inputFiles) {
 					file.status = InputFileStatus.PARSING;
 					tasks.add(CompletableFuture.runAsync(() -> parse(file), executor));
 				}
 			}
 		});
+
 		CompletableFuture.allOf(tasks.toArray(new CompletableFuture[] {})).thenRunAsync(() -> {
 			Profile current = profileRepo.getCurrent();
 			var process = processAppCtrl.get().printPcb;
@@ -267,19 +277,59 @@ public class PrintPcbProcessAppController {
 
 	private void processFile(PrintPcbInputFile file, InputImageData data) {
 		try {
+
+			double toolDiameter = 0.2;
+			double overlap = 0.1;
+
+			// calculate buffers
 			var buffers = new ArrayList<Geometry>();
 			Geometry image = data.image;
-			double bufferDistance = -0.1;
-//			double bufferDistance = -0.04;
+			Geometry remaining;
 			{
-				Geometry buffer = image;
+
+				// do first buffer
+				Geometry buffer = image.buffer(-toolDiameter / 2);
+				if (!buffer.isEmpty())
+					buffers.add(buffer);
+
+				// remove the area covered by first buffer, to avoid having outermost remaining
+				// areas filled
+				remaining = image.buffer(-toolDiameter);
+
+				// remaining buffers
 				while (true) {
-					buffer = buffer.buffer(bufferDistance);
+					buffer = buffer.buffer(-(toolDiameter * (1 - overlap)));
 					if (buffer.isEmpty())
 						break;
 					buffers.add(buffer);
-//							if (bufferSize >= -0.25)
-//								bufferSize *= 2;
+					remaining = OverlayNGRobust.overlay(remaining, buffer.getBoundary().buffer(toolDiameter / 2),
+							OverlayOp.DIFFERENCE);
+				}
+
+				// fill the remaining areas
+				while (!remaining.isEmpty()) {
+					log.info("cls: {}", remaining.getClass());
+					Geometry newRemaining = remaining;
+					var nonCovered = new ArrayList<Geometry>();
+					for (int n = 0; n < remaining.getNumGeometries(); n++) {
+						Geometry g = remaining.getGeometryN(n);
+						Envelope envelope = g.getEnvelopeInternal();
+						if (envelope.getDiameter() < toolDiameter) {
+							buffers.add(image.getFactory().createPoint(envelope.centre()));
+							// TODO: replace by circle
+							newRemaining = OverlayNGRobust.overlay(newRemaining, g.getEnvelope(), OverlayOp.DIFFERENCE);
+							continue;
+						}
+						if (g instanceof Polygon) {
+							Polygon p = (Polygon) g;
+							buffers.add(p);
+							newRemaining = OverlayNGRobust.overlay(newRemaining,
+									p.getBoundary().buffer(toolDiameter / 2), OverlayOp.DIFFERENCE);
+						}
+						nonCovered.add(g);
+					}
+//					remaining = new GeometryCollection(nonCovered.toArray(new Geometry[] {}), image.getFactory());
+					remaining = newRemaining;
 				}
 			}
 
@@ -288,17 +338,27 @@ public class PrintPcbProcessAppController {
 
 			// create svg of buffers
 			{
-				float lineWidth = (float) (Math.abs(bufferDistance) * 2);
+				float lineWidth = (float) toolDiameter;
 				SVGGraphics2D svg = createEmptyCombinedSvg();
 //				svg.setColor(Color.BLACK);
 //				svg.setStroke(new BasicStroke((float) (Math.abs(bufferDistance) * 2)));
 //				buffers.forEach(b -> svg.draw(writer.toShape(b)));
+
 				svg.setColor(Color.YELLOW);
 				svg.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-				buffers.forEach(b -> svg.draw(writer.toShape(b)));
+				buffers.stream().flatMap(notOfType(Point.class)).forEach(b -> svg.draw(writer.toShape(b)));
+
 				svg.setColor(Color.RED);
 				svg.setStroke(new BasicStroke(lineWidth / 4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-				buffers.forEach(b -> svg.draw(writer.toShape(b)));
+				buffers.stream().flatMap(notOfType(Point.class)).forEach(b -> svg.draw(writer.toShape(b)));
+
+				buffers.stream().flatMap(ofType(Point.class))
+						.forEach(point -> svg.fill(new Arc2D.Double(point.getX() - lineWidth / 2,
+								point.getY() - lineWidth / 2, lineWidth, lineWidth, 0, 360, Arc2D.CHORD)));
+
+				svg.setColor(Color.GREEN);
+				svg.fill(writer.toShape(remaining));
+
 				data.buffersSvg = toCombinedSvgString(svg);
 				data.buffersSvgHash = sha256(data.buffersSvg);
 			}
@@ -321,6 +381,24 @@ public class PrintPcbProcessAppController {
 			});
 			throw t;
 		}
+	}
+
+	<T> Function<Object, Stream<T>> ofType(Class<T> cls) {
+		return element -> {
+			if (cls.isInstance(element)) {
+				return Stream.of(cls.cast(element));
+			}
+			return Stream.empty();
+		};
+	}
+
+	<T> Function<T, Stream<T>> notOfType(Class<? extends T> cls) {
+		return element -> {
+			if (!cls.isInstance(element)) {
+				return Stream.of(element);
+			}
+			return Stream.empty();
+		};
 	}
 
 	public static String sha256(String base) {

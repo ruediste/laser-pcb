@@ -29,7 +29,7 @@ let navEntries: NavEntry[] = [
 function Navigation() {
   let location = useLocation();
   return <Navbar bg="light" expand="lg">
-    <Navbar.Brand href="#home">Laser PCB</Navbar.Brand>
+    <Link  className="navbar-brand" to="/process">Laser PCB</Link>
     <Navbar.Toggle aria-controls="basic-navbar-nav" />
     <Navbar.Collapse id="basic-navbar-nav">
       <Nav className="mr-auto">
