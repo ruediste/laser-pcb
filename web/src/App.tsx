@@ -1,18 +1,17 @@
-import './App.css';
-import React, { useEffect } from 'react';
-import { Navbar, Nav } from 'react-bootstrap';
+import React from 'react';
+import { Nav, Navbar } from 'react-bootstrap';
 import {
   BrowserRouter as Router,
-  Switch,
-  Route,
-  Link, useLocation
+  Link, Route, Switch,
+  useLocation
 } from 'react-router-dom';
-import Profile from './Profile';
-import Process from './Process';
-import Control from './Control';
 import { ToastContainer } from 'react-toastify';
-
 import 'react-toastify/dist/ReactToastify.css';
+import './App.css';
+import Control from './Control';
+import Process from './Process';
+import Profile from './Profile';
+
 
 interface NavEntry {
   title: string;

@@ -60,10 +60,20 @@ public class CncConnectionRest {
 		connCtrl.connect(Paths.get(selectedSerialRepo.get()));
 	}
 
+	@PostMapping("cncConnection/_disconnect")
+	void disconnect() {
+		connCtrl.disconnect();
+	}
+
 	@PostMapping("cncConnection/_jog")
 	void jog(@RequestParam String direction) {
 		connCtrl.ensureJogging();
 		if ("X+".equals(direction))
-			connCtrl.getConnection().send("G0 X1\n");
+			connCtrl.getConnection().sendGCode("G0 X1");
+	}
+
+	@PostMapping("cncConnection/_autoHome")
+	void autoHome() {
+		connCtrl.getConnection().sendGCode("G28");
 	}
 }

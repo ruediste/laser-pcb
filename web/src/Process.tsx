@@ -115,49 +115,66 @@ interface PrintPcbProcess {
     readyToProcessFiles: boolean;
 }
 
+function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
+    const [showImage, setShowImage] = useState<any>({});
+    const imageList = [];
+    {
+        let nr = 0;
+        for (let file of printPcb.processedFiles) {
+            // if (showImage[file.file.layer + ' image'] !== false)
+            imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/image' + file.imageSvgHash + '.svg'}
+                style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+
+            // if (showImage[file.file.layer + ' buffers'] !== false)
+            imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/buffers' + file.buffersSvgHash + '.svg'}
+                style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+        }
+    }
+    return <React.Fragment>
+        {printPcb.status}
+        <h1> Gerber Files</h1>
+        <GerberFiles uploadedFiles={printPcb.inputFiles} />
+        <Button disabled={!printPcb.readyToProcessFiles} onClick={() => post("process/printPcb/_processFiles").success('Process Files triggered').send()}>Process Files</Button><br />
+        {printPcb.status !== 'EXPOSING' ? null : <React.Fragment>
+            {printPcb.processedFiles.map((file, idx) => <React.Fragment key={idx}>
+                <InputCheck style={{ display: 'inline-block' }} label={file.file.layer + ' image'} value={showImage[file.file.layer + ' image'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' image']: v } })} />{' '}
+                <InputCheck style={{ display: 'inline-block' }} label={file.file.layer + ' buffers'} value={showImage[file.file.layer + ' buffers'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' buffers']: v } })} />{' '}
+            </React.Fragment>)}
+            <div style={{ position: 'relative' }}>
+                {imageList}
+            </div>
+        </React.Fragment>}
+    </React.Fragment>
+}
+
+interface LaserCalibrationProcess {
+    v1: number
+    v2: number
+}
+
+function LaserCalibration({ laserCalibration }: { laserCalibration: LaserCalibrationProcess }) {
+    return <div>
+        v1: {laserCalibration.v1} v2: {laserCalibration.v2} <br/>
+    <Button onClick={()=>post("process/laserCalibration/printPattern").send()}>Print Pattern</Button>
+     </div>;
+}
+
 interface Process {
     printPcb: PrintPcbProcess;
+    laserCalibration: LaserCalibrationProcess
 }
 
 export default function ProcessComponent() {
-    const [showImage, setShowImage] = useState<any>({});
 
     return <React.Fragment>
         <h1> Process</h1>
         <WithData<Process> url="process"
             refreshMs={1000}
             render={(process) => {
-                let { printPcb } = process;
-                if (printPcb !== undefined) {
-                    const imageList = [];
-                    {
-                        let nr = 0;
-                        for (let file of printPcb.processedFiles) {
-                            // if (showImage[file.file.layer + ' image'] !== false)
-                                imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/image' + file.imageSvgHash + '.svg'}
-                                    style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false?undefined:'none' , shapeRendering:'optimizeSpeed'}} />)
+                let { printPcb, laserCalibration } = process;
+                if (printPcb !== null) return <PrintPcb printPcb={printPcb} />;
+                if (laserCalibration !== null) return <LaserCalibration laserCalibration={laserCalibration} />;
 
-                            // if (showImage[file.file.layer + ' buffers'] !== false)
-                                imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/buffers' + file.buffersSvgHash + '.svg'}
-                                    style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false?undefined:'none', shapeRendering:'optimizeSpeed'  }} />)
-                        }
-                    }
-                    return <React.Fragment>
-                        {printPcb.status}
-                        <h1> Gerber Files</h1>
-                        <GerberFiles uploadedFiles={printPcb.inputFiles} />
-                        <Button disabled={!printPcb.readyToProcessFiles} onClick={() => post("process/printPcb/_processFiles").success('Process Files triggered').send()}>Process Files</Button><br/>
-                        {printPcb.status !== 'EXPOSING' ? null : <React.Fragment>
-                            {printPcb.processedFiles.map((file, idx) => <React.Fragment key={idx}>
-                                <InputCheck style={{display:'inline-block'}} label={file.file.layer + ' image'} value={showImage[file.file.layer + ' image'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' image']: v } })} />{' '}
-                                <InputCheck style={{display:'inline-block'}} label={file.file.layer + ' buffers'} value={showImage[file.file.layer + ' buffers'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' buffers']: v } })} />{' '}
-                            </React.Fragment>)}
-                            <div style={{ position: 'relative' }}>
-                                {imageList}
-                            </div>
-                        </React.Fragment>}
-                    </React.Fragment>
-                }
                 return null;
             }} />
     </React.Fragment>;

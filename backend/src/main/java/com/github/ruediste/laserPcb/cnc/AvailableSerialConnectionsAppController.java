@@ -62,7 +62,7 @@ public class AvailableSerialConnectionsAppController {
 					log.debug("{} event happened on {}", event.kind(), event.context());
 					if (event.kind() == ENTRY_CREATE) {
 						synchronized (this) {
-							Path file = ((Path) event.context()).toAbsolutePath();
+							Path file = directory.resolve((Path) event.context()).toAbsolutePath();
 							if (isTty(file)) {
 								log.info("Adding serial connection {}", file);
 								currentSerialConnections.add(file);
@@ -71,7 +71,7 @@ public class AvailableSerialConnectionsAppController {
 					}
 					if (event.kind() == ENTRY_DELETE) {
 						synchronized (this) {
-							Path file = ((Path) event.context()).toAbsolutePath();
+							Path file = directory.resolve((Path) event.context()).toAbsolutePath();
 							if (isTty(file)) {
 								log.info("Removing serial connection {}", file);
 								currentSerialConnections.remove(file);

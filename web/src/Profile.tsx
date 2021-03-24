@@ -3,8 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { request, post, useRefreshTrigger } from './useData';
 import { toast } from 'react-toastify';
 import Select from 'react-dropdown-select';
-import { Row, Col, Button } from 'react-bootstrap';
-import { InputCheck } from './Inputs';
+import { Row, Col, Button, Card, Collapse } from 'react-bootstrap';
+import { InputCheck, Input } from './Inputs';
+import {
+    useHistory
+  } from 'react-router-dom';
 
 interface EditFunctions<T> {
     update(value: Partial<T>): void;
@@ -45,9 +48,42 @@ interface Profile {
     id: string;
     name: string;
     singleLayerPcb: boolean;
+    laserPower: number;
+    laserDotSize: number;
+    laserZ: number;
+    laserOn: string;
+    laserOff: string;
+
+    bedSizeX: number;
+    bedSizeY: number;
 }
 
+interface CollapseCardProps {
+    title: string;
+    children: React.ReactNode;
+}
+function CollapseCard(props: CollapseCardProps) {
+    const [open, setOpen] = useState(false);
+    return <Card>
+        <Card.Header onClick={() => setOpen(!open)}>{props.title}</Card.Header>
+        <Collapse in={open}>
+            <Card.Body> {props.children} </Card.Body>
+        </Collapse>
+    </Card>;
+}
 
+function LaserCalibration() {
+    const [v1, setV1] = useState(100);
+    const [v2, setV2] = useState(200);
+    const history = useHistory();
+    return <CollapseCard title="Calibration">
+        The laser can be calibrated by exposing a line at two different speeds and then measuring the two line widths.
+        <Input type="number" label="Speed 1" value={'' + v1} onChange={p => setV1(parseFloat(p))} />
+        <Input type="number" label="Speed 2" value={'' + v2} onChange={p => setV2(parseFloat(p))} />
+        <Button onClick={()=>post("process/laserCalibration/start").query({v1:''+v1,v2:''+v2}).error("Error while starting calibration").success(()=>history.push("/process")).send()}>
+            Start Calibration</Button>
+       </CollapseCard>;
+}
 
 export default function ProfileComponent() {
     const [selectedProfile, setSelectedProfile] = useState<Profile[]>([]);
@@ -78,7 +114,21 @@ export default function ProfileComponent() {
             {profile === undefined ? null : <React.Fragment>
                 <Button onClick={() => editProfile.save(() => { profilesRefreshTrigger.trigger(); setSelectedProfile([profile]) })}>Save</Button>
                 <input type="text" className="form-control" placeholder="Profile Name" value={profile.name} onChange={e => editProfile.update({ name: e.target.value })} />
-                <InputCheck label="Single Layer PCB" value={profile.singleLayerPcb } onChange={value => editProfile.update({ singleLayerPcb: value})}/>
+                <InputCheck label="Single Layer PCB" value={profile.singleLayerPcb} onChange={value => editProfile.update({ singleLayerPcb: value })} />
+                        <Input type="number" label="X Bed Size" value={'' + profile.bedSizeX} onChange={p => editProfile.update({ bedSizeX: parseFloat(p) })} />
+                        <Input type="number" label="Y Bed Size" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
+
+                <Card>
+                    <Card.Title >Laser</Card.Title>
+                    <Card.Body>
+                        <Input type="number" label="Laser Power [m^2/s]" value={'' + profile.laserPower} onChange={p => editProfile.update({ laserPower: parseFloat(p) })} />
+                        <Input type="number" label="Laser Dot Size (diameter, [mm])" value={'' + profile.laserDotSize} onChange={p => editProfile.update({ laserDotSize: parseFloat(p) })} />
+                        <Input type="number" label="Laser Z" value={'' + profile.laserZ} onChange={p => editProfile.update({ laserZ: parseFloat(p) })} />
+                        <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn:p })} />
+                        <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff:p })} />
+                        <LaserCalibration />
+                    </Card.Body>
+                </Card>
             </React.Fragment>}
         </div>
     </React.Fragment>

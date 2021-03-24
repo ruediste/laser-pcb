@@ -1,4 +1,4 @@
-package com.github.ruediste.laserPcb.process.printPcb;
+package com.github.ruediste.laserPcb.process.laserCalibration;
 
 import java.util.List;
 
@@ -13,7 +13,9 @@ import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.CMAESOptimizer;
 import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.PowellOptimizer;
 import org.apache.commons.math3.random.JDKRandomGenerator;
+import org.springframework.stereotype.Service;
 
+@Service
 public class CalibrationService {
 
 	public static class LaserParameters {
