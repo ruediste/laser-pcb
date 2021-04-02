@@ -30,14 +30,6 @@ public class LaserCalibrationAppController {
 	@Autowired
 	ProfileRepository profileRepo;
 
-	private String formatFeed(double value) {
-		return "" + (int) Math.round(value);
-	}
-
-	private String formatCoordinate(double value) {
-		return String.format("%.2f", value);
-	}
-
 	public void printPattern() {
 		log.info("Print Pattern");
 		Profile profile = profileRepo.getCurrent();
@@ -45,18 +37,19 @@ public class LaserCalibrationAppController {
 		LaserCalibrationProcess process = processAppCtrl.get().laserCalibration;
 		gCodes.add("G90"); // absolute positioning
 		gCodes.add("G21"); // set units to millimeters
-		gCodes.g0(null, null, profile.laserZ, 10000.); // go to laser hight
+		double fastFeed = 10000.;
+		gCodes.g0(null, null, profile.laserZ, fastFeed); // go to laser height
 
 		double lineLength = 10;
 		double lineDistance = 10;
 
 		double originX = profile.bedSizeX / 2 - lineLength / 2;
 		double originY = profile.bedSizeY / 2 - lineDistance / 2;
-		gCodes.g0(originX, originY);
+		gCodes.g0(originX, originY, null, fastFeed);
 		gCodes.add(profile.laserOn);
 		gCodes.g1(originX + lineLength, null, null, process.v1);
 		gCodes.add(profile.laserOff);
-		gCodes.g0(originX, originY + lineDistance);
+		gCodes.g0(originX, originY + lineDistance, null, fastFeed);
 		gCodes.add(profile.laserOn);
 		gCodes.g1(originX + lineLength, null, null, process.v2);
 		gCodes.add(profile.laserOff);

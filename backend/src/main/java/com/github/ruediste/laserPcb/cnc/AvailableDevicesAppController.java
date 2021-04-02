@@ -24,21 +24,20 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Watches /dev/tty* for changes
+ * Watches /dev/* for changes
  */
 @Component
-public class AvailableSerialConnectionsAppController {
+public class AvailableDevicesAppController {
 
-	private final Logger log = LoggerFactory.getLogger(AvailableSerialConnectionsAppController.class);
+	private final Logger log = LoggerFactory.getLogger(AvailableDevicesAppController.class);
 
 	private WatchService watchService;
 	private Path directory = Paths.get("/dev");
-//	private Path directory = Paths.get("dev");
 
 	@PostConstruct
 	public void postConstruct() throws IOException {
 		watchService = FileSystems.getDefault().newWatchService();
-		new Thread(this::watch, "serialConnectionWatcher").start();
+		new Thread(this::watch, "availaleDevicesScanner").start();
 	}
 
 	@PreDestroy
@@ -51,6 +50,7 @@ public class AvailableSerialConnectionsAppController {
 	}
 
 	private final Set<Path> currentSerialConnections = new HashSet<>();
+	private final Set<Path> currentVideoConnections = new HashSet<>();
 
 	private void watch() {
 		try {
@@ -63,18 +63,26 @@ public class AvailableSerialConnectionsAppController {
 					if (event.kind() == ENTRY_CREATE) {
 						synchronized (this) {
 							Path file = directory.resolve((Path) event.context()).toAbsolutePath();
-							if (isTty(file)) {
+							if (isSerialConnection(file)) {
 								log.info("Adding serial connection {}", file);
 								currentSerialConnections.add(file);
+							}
+							if (isVideoConnection(file)) {
+								log.info("Adding video connection {}", file);
+								currentVideoConnections.add(file);
 							}
 						}
 					}
 					if (event.kind() == ENTRY_DELETE) {
 						synchronized (this) {
 							Path file = directory.resolve((Path) event.context()).toAbsolutePath();
-							if (isTty(file)) {
+							if (isSerialConnection(file)) {
 								log.info("Removing serial connection {}", file);
 								currentSerialConnections.remove(file);
+							}
+							if (isVideoConnection(file)) {
+								log.info("Removing video connection {}", file);
+								currentVideoConnections.remove(file);
 							}
 						}
 					}
@@ -94,18 +102,27 @@ public class AvailableSerialConnectionsAppController {
 
 	}
 
-	private boolean isTty(Path path) {
+	private boolean isSerialConnection(Path path) {
 		return path.getFileName().toString().startsWith("ttyUSB");
 	}
 
+	private boolean isVideoConnection(Path path) {
+		return path.getFileName().toString().startsWith("video");
+	}
+
 	private synchronized void scan() {
-		log.info("Serial connection scan of {} starting ...", directory.toAbsolutePath());
+		log.info("Device scan of {} starting ...", directory.toAbsolutePath());
 		currentSerialConnections.clear();
+		currentVideoConnections.clear();
 		try {
 			Files.list(directory).forEach(file -> {
-				if (isTty(file)) {
+				if (isSerialConnection(file)) {
 					log.info("Adding serial connection {}", file.toAbsolutePath());
 					currentSerialConnections.add(file.toAbsolutePath());
+				}
+				if (isVideoConnection(file)) {
+					log.info("Adding video connection {}", file.toAbsolutePath());
+					currentVideoConnections.add(file.toAbsolutePath());
 				}
 			});
 
@@ -117,5 +134,9 @@ public class AvailableSerialConnectionsAppController {
 
 	public synchronized Set<Path> getCurrentSerialConnections() {
 		return new HashSet<>(currentSerialConnections);
+	}
+
+	public synchronized Set<Path> getCurrentVideoConnections() {
+		return new HashSet<>(currentVideoConnections);
 	}
 }

@@ -6,6 +6,7 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,10 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class CncConnectionRest {
 
 	@Autowired
-	AvailableSerialConnectionsAppController ctrl;
+	AvailableDevicesAppController ctrl;
 
 	@Autowired
 	SelectedSerialConnectionRepository selectedSerialRepo;
+
+	@Autowired
+	VideoAppController videoCtrl;
 
 	@Autowired
 	CncConnectionAppController connCtrl;
@@ -26,33 +30,63 @@ public class CncConnectionRest {
 	public static class CncConnectionState {
 		public String selectedSerialConnection;
 		public List<String> availableSerialConnections;
-		public boolean connected;
+		public boolean serialConnected;
 
 		public Double x;
 		public Double y;
 		public Double z;
+
+		public String selectedVideoConnection;
+		public List<String> availableVideoConnections;
+		public boolean videoConnected;
 	}
 
 	@GetMapping("cncConnection")
-	CncConnectionState getSerialConnections() {
+	CncConnectionState cncConnectionState() {
 		var result = new CncConnectionState();
 		CncConnection connection = connCtrl.getConnection();
-		result.connected = connection != null;
+
+		result.serialConnected = connection != null;
 		result.selectedSerialConnection = selectedSerialRepo.get();
-		result.availableSerialConnections = result.availableSerialConnections = ctrl.getCurrentSerialConnections()
-				.stream().map(x -> x.toAbsolutePath().toString()).sorted().collect(toList());
+		result.availableSerialConnections = ctrl.getCurrentSerialConnections().stream().map(x -> x.toString()).sorted()
+				.collect(toList());
+
 		if (connection != null) {
 			var state = connection.getState();
 			result.x = state.x;
 			result.y = state.y;
 			result.z = state.z;
 		}
+
+		result.selectedVideoConnection = videoCtrl.getVideoDevice();
+		result.availableVideoConnections = ctrl.getCurrentVideoConnections().stream().map(x -> x.toString()).sorted()
+				.collect(toList());
+
 		return result;
 	}
 
 	@PostMapping("cncConnection/_setSerialConnection")
-	void setCurrentConnection(@RequestParam String dev) {
+	void setCurrentSerialConnection(@RequestParam String dev) {
 		selectedSerialRepo.set(dev);
+	}
+
+	@PostMapping("cncConnection/_setVideoConnection")
+	void setCurrentVideoConnection(@RequestParam String dev) {
+		videoCtrl.connect(dev);
+	}
+
+	@GetMapping(value = "cncConnection/frame.jpg", produces = MimeTypeUtils.IMAGE_JPEG_VALUE)
+	byte[] getFrame() {
+		Object lock = videoCtrl.getLock();
+		synchronized (lock) {
+			try {
+				lock.wait(250);
+			} catch (InterruptedException e) {
+				Thread.interrupted();
+				return null;
+			}
+		}
+		return videoCtrl.getCurrentFrame();
 	}
 
 	@PostMapping("cncConnection/_connect")
