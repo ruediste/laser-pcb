@@ -8,13 +8,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationProcess;
+import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcess;
 import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PcbLayer;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PrintPcbInputFile;
-import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessAppController;
+import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessController;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessPMod;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessPMod.PrintPcbInputFilePMod;
 import com.github.ruediste.laserPcb.profile.Profile;
@@ -25,7 +27,7 @@ public class ProcessRest {
 	private final Logger logger = LoggerFactory.getLogger(ProcessRest.class);
 
 	@Autowired
-	ProcessAppController ctrl;
+	ProcessController ctrl;
 
 	@Autowired
 	ProcessRepository repo;
@@ -34,7 +36,7 @@ public class ProcessRest {
 	ProfileRepository profileRepo;
 
 	@Autowired
-	PrintPcbProcessAppController printPcbCtrl;
+	PrintPcbProcessController printPcbCtrl;
 
 	@GetMapping("process")
 	ProcessPMod getProcess() {
@@ -46,6 +48,8 @@ public class ProcessRest {
 			processPMod.printPcb = toPMod(printPcb, profile);
 		if (process.laserCalibration != null)
 			processPMod.laserCalibration = toPMod(process.laserCalibration);
+		if (process.cameraCalibration != null)
+			processPMod.cameraCalibration = toPMod(process.cameraCalibration);
 		return processPMod;
 	}
 
@@ -74,6 +78,12 @@ public class ProcessRest {
 		LaserCalibrationProcessPMod pMod = new LaserCalibrationProcessPMod();
 		pMod.v1 = process.v1;
 		pMod.v2 = process.v2;
+		return pMod;
+	}
+
+	private CameraCalibrationProcessPMod toPMod(CameraCalibrationProcess process) {
+		CameraCalibrationProcessPMod pMod = new CameraCalibrationProcessPMod();
+		pMod.currentStep = process.currentStep;
 		return pMod;
 	}
 

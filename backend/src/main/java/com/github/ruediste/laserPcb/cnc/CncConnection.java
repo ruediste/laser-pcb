@@ -2,7 +2,9 @@ package com.github.ruediste.laserPcb.cnc;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -30,12 +32,14 @@ public class CncConnection {
 	volatile private boolean connectionOpened;
 	private CncFirmwareType firmwareType;
 
-	private static class InFlightGCode {
-		public byte[] gCode;
+	public static class InFlightGCode {
+		public byte[] gCodeBytes;
+		public String gCodeString;
 		public Runnable onCompletion;
 
-		public InFlightGCode(byte[] gCode, Runnable onCompletion) {
-			this.gCode = gCode;
+		public InFlightGCode(byte[] gCodeBytes, String gCodeString, Runnable onCompletion) {
+			this.gCodeBytes = gCodeBytes;
+			this.gCodeString = gCodeString;
 			this.onCompletion = onCompletion;
 		}
 
@@ -50,9 +54,9 @@ public class CncConnection {
 	}
 
 	static Pattern statusLinePatternGrbl = Pattern.compile(
-			"<(?<status>[A-Z][a-z]+)\\|MPos:(?<x>\\d+\\.\\d+),(?<y>\\d+\\.\\d+),(?<z>\\d+\\.\\d+)(\\|[^>]*)*>");
+			"<(?<status>[A-Z][a-z]+)\\|MPos:(?<x>-?\\d+\\.\\d+),(?<y>-?\\d+\\.\\d+),(?<z>-?\\d+\\.\\d+)(\\|[^>]*)*>");
 	static Pattern statusLinePatternMarlin = Pattern
-			.compile("X:(?<x>\\d+\\.\\d+) Y:(?<y>\\d+\\.\\d+) Z:(?<z>\\d+\\.\\d+).*");
+			.compile("X:(?<x>-?\\d+\\.\\d+) Y:(?<y>-?\\d+\\.\\d+) Z:(?<z>-?\\d+\\.\\d+).*");
 
 	private void readLoop() {
 		log.info("Starting to read from serial port {}", con.port);
@@ -109,7 +113,7 @@ public class CncConnection {
 								lock.notifyAll();
 							}
 							log.info("Response for {}: \"{}\" inFlight: {}",
-									removeTrailingNewlines(new String(gCode.gCode, StandardCharsets.UTF_8)), line,
+									removeTrailingNewlines(new String(gCode.gCodeBytes, StandardCharsets.UTF_8)), line,
 									totalInFlightGCodeSize);
 							try {
 								if (gCode.onCompletion != null)
@@ -147,14 +151,13 @@ public class CncConnection {
 	public boolean sendGCodeNonBlocking(String gCode, Runnable onCompletion) {
 		gCode = removeTrailingNewlines(gCode);
 		log.info("Sending {}", gCode);
-		gCode += "\n";
-		byte[] bb = gCode.getBytes(StandardCharsets.UTF_8);
+		byte[] bb = (gCode + "\n").getBytes(StandardCharsets.UTF_8);
 
 		synchronized (lock) {
 			int totalSize = totalInFlightGCodeSize();
 			totalSize += bb.length;
 			if (totalSize < controllerReceiveBufferSize) {
-				inFlightGCodes.addLast(new InFlightGCode(bb, onCompletion));
+				inFlightGCodes.addLast(new InFlightGCode(bb, gCode, onCompletion));
 			} else
 				return false;
 
@@ -172,17 +175,31 @@ public class CncConnection {
 	}
 
 	public void sendGCode(String gCode, Runnable onCompletion) {
+		isJogging = false;
+		sendGCodeImpl(gCode, onCompletion);
+	}
+
+	public void sendGCodeForJog(String gCode) {
+		if (!isJogging) {
+			isJogging = true;
+			sendGCodeImpl("G91", null); // relative positioning
+			sendGCodeImpl("G21", null); // set units to millimeters
+			sendGCodeImpl("G0 F100", null); // set feed
+		}
+		sendGCodeImpl(gCode, null);
+	}
+
+	public void sendGCodeImpl(String gCode, Runnable onCompletion) {
 		gCode = removeTrailingNewlines(gCode);
 		log.info("Sending {}", gCode);
-		gCode += "\n";
-		byte[] bb = gCode.getBytes(StandardCharsets.UTF_8);
+		byte[] bb = (gCode + "\n").getBytes(StandardCharsets.UTF_8);
 
 		synchronized (lock) {
 			while (true) {
 				int totalSize = totalInFlightGCodeSize();
 				totalSize += bb.length;
 				if (totalSize < controllerReceiveBufferSize) {
-					inFlightGCodes.addLast(new InFlightGCode(bb, onCompletion));
+					inFlightGCodes.addLast(new InFlightGCode(bb, gCode, onCompletion));
 					break;
 				}
 				try {
@@ -196,14 +213,19 @@ public class CncConnection {
 		con.sendBytes(bb);
 	}
 
+	private boolean isJogging;
+
 	private String removeTrailingNewlines(String s) {
 		while (s.length() > 0 && (s.endsWith("\r") || s.endsWith("\n")))
 			s = s.substring(0, s.length() - 1);
 		return s;
 	}
 
+	/**
+	 * call only while holding the {@link #lock}
+	 */
 	private int totalInFlightGCodeSize() {
-		return inFlightGCodes.stream().collect(Collectors.summingInt(x -> x.gCode.length));
+		return inFlightGCodes.stream().collect(Collectors.summingInt(x -> x.gCodeBytes.length));
 	}
 
 	public void close() {
@@ -266,6 +288,12 @@ public class CncConnection {
 	public CncState getState() {
 		synchronized (state) {
 			return new CncState(state);
+		}
+	}
+
+	public List<InFlightGCode> getInFlightGCodes() {
+		synchronized (lock) {
+			return new ArrayList<>(inFlightGCodes);
 		}
 	}
 

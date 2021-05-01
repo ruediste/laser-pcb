@@ -21,13 +21,10 @@ public class CncConnectionAppController {
 	private CncConnection connection;
 	private ScheduledFuture<?> stateFuture;
 
-	private boolean isJogging;
-
 	public synchronized void connect(Path serialDev) {
 		disconnect();
 		connection = new CncConnection(new SerialConnection(serialDev.toAbsolutePath().toString()));
 		stateFuture = executor.scheduleWithFixedDelay(() -> connection.queryStatus(), 500, 2000, TimeUnit.MILLISECONDS);
-		isJogging = false;
 	}
 
 	public synchronized void disconnect() {
@@ -47,15 +44,6 @@ public class CncConnectionAppController {
 	public void preDestroy() {
 		disconnect();
 		executor.shutdownNow();
-	}
-
-	public void ensureJogging() {
-		if (!isJogging) {
-			isJogging = true;
-			connection.sendGCode("G91"); // relative positioning
-			connection.sendGCode("G21"); // set units to millimeters
-			connection.sendGCode("G0 F100"); // set feed
-		}
 	}
 
 }

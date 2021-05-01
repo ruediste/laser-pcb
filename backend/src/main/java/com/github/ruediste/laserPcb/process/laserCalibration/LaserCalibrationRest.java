@@ -7,17 +7,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.github.ruediste.laserPcb.process.ProcessAppController;
+import com.github.ruediste.laserPcb.process.ProcessController;
 
 @RestController
 public class LaserCalibrationRest {
 	private final Logger log = LoggerFactory.getLogger(LaserCalibrationRest.class);
 
 	@Autowired
-	ProcessAppController processAppController;
+	ProcessController processAppController;
 
 	@Autowired
-	LaserCalibrationAppController ctrl;
+	LaserCalibrationPatternService ctrl;
 
 	@PostMapping("process/laserCalibration/start")
 	void start(@RequestParam double v1, @RequestParam double v2) {

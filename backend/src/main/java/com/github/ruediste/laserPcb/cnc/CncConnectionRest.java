@@ -80,7 +80,7 @@ public class CncConnectionRest {
 		Object lock = videoCtrl.getLock();
 		synchronized (lock) {
 			try {
-				lock.wait(250);
+				lock.wait(500);
 			} catch (InterruptedException e) {
 				Thread.interrupted();
 				return null;
@@ -101,9 +101,20 @@ public class CncConnectionRest {
 
 	@PostMapping("cncConnection/_jog")
 	void jog(@RequestParam String direction) {
-		connCtrl.ensureJogging();
+		if ("X-".equals(direction))
+			connCtrl.getConnection().sendGCodeForJog("G0 X-1");
 		if ("X+".equals(direction))
-			connCtrl.getConnection().sendGCode("G0 X1");
+			connCtrl.getConnection().sendGCodeForJog("G0 X1");
+
+		if ("Y-".equals(direction))
+			connCtrl.getConnection().sendGCodeForJog("G0 Y-1");
+		if ("Y+".equals(direction))
+			connCtrl.getConnection().sendGCodeForJog("G0 Y1");
+
+		if ("Z-".equals(direction))
+			connCtrl.getConnection().sendGCodeForJog("G0 Z-1");
+		if ("Z+".equals(direction))
+			connCtrl.getConnection().sendGCodeForJog("G0 Z1");
 	}
 
 	@PostMapping("cncConnection/_autoHome")

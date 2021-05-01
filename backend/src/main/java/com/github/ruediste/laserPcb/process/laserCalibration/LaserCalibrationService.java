@@ -16,7 +16,7 @@ import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.springframework.stereotype.Service;
 
 @Service
-public class CalibrationService {
+public class LaserCalibrationService {
 
 	public static class LaserParameters {
 		public double P;

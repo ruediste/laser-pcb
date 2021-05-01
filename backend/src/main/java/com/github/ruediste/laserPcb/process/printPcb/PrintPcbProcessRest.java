@@ -16,15 +16,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.github.ruediste.laserPcb.fileUpload.FileUploadService;
+import com.github.ruediste.laserPcb.process.ProcessController;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PrintPcbInputFile;
-import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessAppController.InputImageData;
+import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessController.InputImageData;
 
 @RestController
 public class PrintPcbProcessRest {
 	private final Logger logger = LoggerFactory.getLogger(PrintPcbProcessRest.class);
 
 	@Autowired
-	PrintPcbProcessAppController ctrl;
+	PrintPcbProcessController ctrl;
+
+	@Autowired
+	ProcessController processCtrl;
 
 	@Autowired
 	FileUploadService fileUploadService;
@@ -43,6 +47,16 @@ public class PrintPcbProcessRest {
 	@DeleteMapping(value = "process/printPcb/file/{id}")
 	public void removeInputFile(@PathVariable String id) {
 		ctrl.removeFile(UUID.fromString(id));
+	}
+
+	@PostMapping(value = "process/printPcb/launch")
+	public void launch() {
+		processCtrl.update(p -> {
+			if (p.printPcb == null) {
+				p.clear();
+				p.printPcb = new PrintPcbProcess();
+			}
+		});
 	}
 
 	@PostMapping(value = "process/printPcb/file/{id}")

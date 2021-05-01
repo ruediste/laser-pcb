@@ -5,6 +5,9 @@ import java.util.List;
 
 public class GCodeWriter {
 	private List<String> gCodes = new ArrayList<>();
+	Double lastFeedG0;
+	Double lastFeedG1;
+	Double lastFeed;
 
 	public List<String> getGCodes() {
 		return gCodes;
@@ -16,6 +19,13 @@ public class GCodeWriter {
 
 	private String formatCoordinate(double value) {
 		return String.format("%.2f", value);
+	}
+
+	/**
+	 * Rapid Motion
+	 */
+	public void g0(double f) {
+		g0(null, null, null, f);
 	}
 
 	/**
@@ -36,10 +46,25 @@ public class GCodeWriter {
 			gCode += " Y" + formatCoordinate(y);
 		if (z != null)
 			gCode += " Z" + formatCoordinate(z);
-		if (f != null)
+
+		if (f == null)
+			f = lastFeedG0;
+		else
+			lastFeedG0 = f;
+
+		if (f != null && !f.equals(lastFeed)) {
 			gCode += " F" + formatFeed(f);
+			lastFeed = f;
+		}
 		gCodes.add(gCode);
 		return this;
+	}
+
+	/**
+	 * Coordinated Motion
+	 */
+	public void g1(double f) {
+		g1(null, null, null, f);
 	}
 
 	/**
@@ -60,8 +85,16 @@ public class GCodeWriter {
 			gCode += " Y" + formatCoordinate(y);
 		if (z != null)
 			gCode += " Z" + formatCoordinate(z);
-		if (x != null)
+
+		if (f == null)
+			f = lastFeedG1;
+		else
+			lastFeedG1 = f;
+
+		if (f != null && !f.equals(lastFeed)) {
 			gCode += " F" + formatFeed(f);
+			lastFeed = f;
+		}
 		gCodes.add(gCode);
 		return this;
 	}

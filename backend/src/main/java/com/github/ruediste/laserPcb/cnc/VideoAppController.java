@@ -98,6 +98,7 @@ public class VideoAppController {
 								lock.notifyAll();
 							}
 							baos.reset();
+							Thread.sleep(10000);
 						}
 					}
 

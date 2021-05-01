@@ -13,5 +13,7 @@ public class CncConnectionTest {
 		Matcher matcher = CncConnection.statusLinePatternGrbl
 				.matcher("<Idle|MPos:0.000,0.000,0.000|FS:0,0|WCO:50.800,0.000,0.000>");
 		assertTrue(matcher.matches());
+		matcher = CncConnection.statusLinePatternGrbl.matcher("<Idle|MPos:3.000,-2.000,0.000|FS:0,0>");
+		assertTrue(matcher.matches());
 	}
 }

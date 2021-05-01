@@ -43,7 +43,6 @@ import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import com.github.ruediste.gerberLib.WarningCollector;
@@ -55,7 +54,7 @@ import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter.Attribute;
 import com.github.ruediste.gerberLib.readGeometricPrimitive.GerberReadGeometricPrimitiveAdapter;
 import com.github.ruediste.laserPcb.fileUpload.FileUploadService;
-import com.github.ruediste.laserPcb.process.ProcessAppController;
+import com.github.ruediste.laserPcb.process.ProcessController;
 import com.github.ruediste.laserPcb.process.ProcessRepository;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PcbLayer;
@@ -65,9 +64,8 @@ import com.github.ruediste.laserPcb.profile.Profile;
 import com.github.ruediste.laserPcb.profile.ProfileRepository;
 
 @Service
-@Scope("singleton")
-public class PrintPcbProcessAppController {
-	private final Logger log = LoggerFactory.getLogger(PrintPcbProcessAppController.class);
+public class PrintPcbProcessController {
+	private final Logger log = LoggerFactory.getLogger(PrintPcbProcessController.class);
 
 	@Autowired
 	ProcessRepository repo;
@@ -79,7 +77,7 @@ public class PrintPcbProcessAppController {
 	ProfileRepository profileRepo;
 
 	@Autowired
-	ProcessAppController processAppCtrl;
+	ProcessController processAppCtrl;
 
 	private ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -239,7 +237,7 @@ public class PrintPcbProcessAppController {
 				data.buffersSvg = null;
 
 				file.status = InputFileStatus.PROCESSING;
-				tasks.add(() -> processFile(file, data));
+				tasks.add(() -> processFile(file, data, currentProfile));
 				if (combinedBounds == null)
 					combinedBounds = data.imageBounds;
 				else
@@ -275,11 +273,11 @@ public class PrintPcbProcessAppController {
 
 	private int combinedSvgTargetHeight;
 
-	private void processFile(PrintPcbInputFile file, InputImageData data) {
+	private void processFile(PrintPcbInputFile file, InputImageData data, Profile currentProfile) {
 		try {
 
-			double toolDiameter = 0.2;
-			double overlap = 0.1;
+			double toolDiameter = currentProfile.exposureWidth;
+			double overlap = currentProfile.exposureOverlap;
 
 			// calculate buffers
 			var buffers = new ArrayList<Geometry>();

@@ -7,7 +7,7 @@ import { Row, Col, Button, Card, Collapse } from 'react-bootstrap';
 import { InputCheck, Input } from './Inputs';
 import {
     useHistory
-  } from 'react-router-dom';
+} from 'react-router-dom';
 
 interface EditFunctions<T> {
     update(value: Partial<T>): void;
@@ -51,11 +51,22 @@ interface Profile {
     laserPower: number;
     laserDotSize: number;
     laserZ: number;
+    exposureOverlap: number;
+    
+    exposureWidth: number;
+    exposureFeed: number;
+    fastMovementFeed: number;
+    
     laserOn: string;
     laserOff: string;
 
     bedSizeX: number;
     bedSizeY: number;
+
+    cameraOffsetX: number;
+    cameraOffsetY: number;
+
+
 }
 
 interface CollapseCardProps {
@@ -80,12 +91,13 @@ function LaserCalibration() {
         The laser can be calibrated by exposing a line at two different speeds and then measuring the two line widths.
         <Input type="number" label="Speed 1" value={'' + v1} onChange={p => setV1(parseFloat(p))} />
         <Input type="number" label="Speed 2" value={'' + v2} onChange={p => setV2(parseFloat(p))} />
-        <Button onClick={()=>post("process/laserCalibration/start").query({v1:''+v1,v2:''+v2}).error("Error while starting calibration").success(()=>history.push("/process")).send()}>
+        <Button onClick={() => post("process/laserCalibration/start").query({ v1: '' + v1, v2: '' + v2 }).error("Error while starting calibration").success(() => history.push("/process")).send()}>
             Start Calibration</Button>
-       </CollapseCard>;
+    </CollapseCard>;
 }
 
 export default function ProfileComponent() {
+    const history = useHistory();
     const [selectedProfile, setSelectedProfile] = useState<Profile[]>([]);
     const [profile, editProfile] = useEdit<Profile>(selectedProfile.length === 0 ? undefined : 'profile/' + selectedProfile[0].id);
     const profilesRefreshTrigger = useRefreshTrigger();
@@ -115,18 +127,33 @@ export default function ProfileComponent() {
                 <Button onClick={() => editProfile.save(() => { profilesRefreshTrigger.trigger(); setSelectedProfile([profile]) })}>Save</Button>
                 <input type="text" className="form-control" placeholder="Profile Name" value={profile.name} onChange={e => editProfile.update({ name: e.target.value })} />
                 <InputCheck label="Single Layer PCB" value={profile.singleLayerPcb} onChange={value => editProfile.update({ singleLayerPcb: value })} />
-                        <Input type="number" label="X Bed Size" value={'' + profile.bedSizeX} onChange={p => editProfile.update({ bedSizeX: parseFloat(p) })} />
-                        <Input type="number" label="Y Bed Size" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
+                <Input type="number" label="X Bed Size [mm]" value={'' + profile.bedSizeX} onChange={p => editProfile.update({ bedSizeX: parseFloat(p) })} />
+                <Input type="number" label="Y Bed Size [mm]" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
+                <Input type="number" label="Fast Movement Feed [mm/s]" value={'' + profile.fastMovementFeed} onChange={p => editProfile.update({ fastMovementFeed: parseFloat(p) })} />
 
                 <Card>
                     <Card.Title >Laser</Card.Title>
                     <Card.Body>
                         <Input type="number" label="Laser Power [m^2/s]" value={'' + profile.laserPower} onChange={p => editProfile.update({ laserPower: parseFloat(p) })} />
                         <Input type="number" label="Laser Dot Size (diameter, [mm])" value={'' + profile.laserDotSize} onChange={p => editProfile.update({ laserDotSize: parseFloat(p) })} />
-                        <Input type="number" label="Laser Z" value={'' + profile.laserZ} onChange={p => editProfile.update({ laserZ: parseFloat(p) })} />
-                        <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn:p })} />
-                        <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff:p })} />
+                        <Input type="number" label="Laser Z [mm]" value={'' + profile.laserZ} onChange={p => editProfile.update({ laserZ: parseFloat(p) })} />
+                        <Input type="number" label="Overlap between exposures (fraction of exposure width)" value={'' + profile.exposureOverlap} onChange={p => editProfile.update({ exposureOverlap: parseFloat(p) })} />
+
+                        <Input type="number" label="Exposure Width [mm]" comment="temporary exposure setting" value={'' + profile.exposureWidth} onChange={p => editProfile.update({ exposureWidth: parseFloat(p) })} />
+                        <Input type="number" label="Exposure Feed [mm/s]" comment="temporary exposure setting" value={'' + profile.exposureFeed} onChange={p => editProfile.update({ exposureFeed: parseFloat(p) })} />
+
+                        <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn: p })} />
+                        <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff: p })} />
                         <LaserCalibration />
+                    </Card.Body>
+                </Card>
+                <Card>
+                    <Card.Title >Camera</Card.Title>
+                    <Card.Body>
+                        <Input type="number" label="CameraOffset X [mm]" value={'' + profile.cameraOffsetX} onChange={p => editProfile.update({ cameraOffsetX: parseFloat(p) })} />
+                        <Input type="number" label="CameraOffset Y [mm]" value={'' + profile.cameraOffsetY} onChange={p => editProfile.update({ cameraOffsetY: parseFloat(p) })} />
+                        <Button onClick={() => post("process/cameraCalibration/start").error("Error while starting calibration").success(() => history.push("/process")).send()}>
+                            Start Calibration</Button>
                     </Card.Body>
                 </Card>
             </React.Fragment>}

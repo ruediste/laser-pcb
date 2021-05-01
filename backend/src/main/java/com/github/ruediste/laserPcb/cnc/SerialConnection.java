@@ -27,7 +27,7 @@ public class SerialConnection {
 		this.port = port;
 		log.info("Opening {}", port);
 		commPort = SerialPort.getCommPort(port);
-		commPort.setBaudRate(250000);
+		commPort.setBaudRate(115200);
 		commPort.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 1000, 1000);
 		commPort.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
 		commPort.setNumDataBits(8);

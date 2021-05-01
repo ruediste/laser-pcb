@@ -6,6 +6,9 @@ import { toast } from 'react-toastify';
 import WithData from './WithData';
 import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
 import { InputCheck } from './Inputs';
+import JoggingControls from './JoggingControls';
+import { SendGCode } from './SendGCode';
+import CameraView from './CameraView';
 
 interface UploadingFile {
     name: string;
@@ -29,13 +32,13 @@ function UploadedFile(props: UploadedFileProps) {
             <span className="mr-auto">{file.file.name}</span>
             <span>{file.file.status}</span>
             <NoClickBubble><Select options={[{ label: 'TOP', value: 'TOP' }, { label: 'BOTTOM', value: "BOTTOM" }]} values={file.file.layer === undefined ? [] : [{ label: file.file.layer, value: file.file.layer }]}
-                onChange={(value) => { post('process/printPcb/file/' + file.file.id).body({ layer: value.length == 0 ? null : value[0].value }).success('Layer changed').send() }} /></NoClickBubble>
+                onChange={(value) => { post('process/printPcb/file/' + file.file.id).body({ layer: value.length === 0 ? null : value[0].value }).success('Layer changed').send() }} /></NoClickBubble>
             <NoClickBubble><Button onClick={(e) => request('process/printPcb/file/' + file.file.id).method('DELETE').success('File ' + file.file.name + " removed").send()}>Remove</Button></NoClickBubble>
         </div>
         {
             open ? <div>
                 {file.file.errorMessage !== undefined ? file.file.errorMessage : null}
-                {file.inputSvgAvailable ? <img src={baseUrl + 'process/printPcb/file/' + file.file.id + '/input' + file.inputSvgHash + '.svg'} style={{ width: '50%' }} /> : null}
+                {file.inputSvgAvailable ? <img src={baseUrl + 'process/printPcb/file/' + file.file.id + '/input' + file.inputSvgHash + '.svg'} style={{ width: '50%' }} alt="Camera View" /> : null}
             </div> : null
         }
     </li >;
@@ -122,12 +125,12 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
         let nr = 0;
         for (let file of printPcb.processedFiles) {
             // if (showImage[file.file.layer + ' image'] !== false)
-            imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/image' + file.imageSvgHash + '.svg'}
-                style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+            imageList.push(<img key={nr} alt="PCB" src={baseUrl + 'process/printPcb/file/' + file.file.id + '/image' + file.imageSvgHash + '.svg'}
+                style={{ width: '100%', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
 
             // if (showImage[file.file.layer + ' buffers'] !== false)
-            imageList.push(<img key={nr} src={baseUrl + 'process/printPcb/file/' + file.file.id + '/buffers' + file.buffersSvgHash + '.svg'}
-                style={{ width: '100%', position: (nr++) == 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+            imageList.push(<img key={nr} alt="Buffers" src={baseUrl + 'process/printPcb/file/' + file.file.id + '/buffers' + file.buffersSvgHash + '.svg'}
+                style={{ width: '100%', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
         }
     }
     return <React.Fragment>
@@ -154,26 +157,57 @@ interface LaserCalibrationProcess {
 
 function LaserCalibration({ laserCalibration }: { laserCalibration: LaserCalibrationProcess }) {
     return <div>
-        v1: {laserCalibration.v1} v2: {laserCalibration.v2} <br/>
-    <Button onClick={()=>post("process/laserCalibration/printPattern").send()}>Print Pattern</Button>
-     </div>;
+        v1: {laserCalibration.v1} v2: {laserCalibration.v2} <br />
+        <Button onClick={() => post("process/laserCalibration/printPattern").send()}>Print Pattern</Button>
+    </div>;
+}
+
+
+interface CameraCalibrationProcess {
+    currentStep: 'MOVE_TO_ORIGIN' | 'EXPOSE_CROSS' | 'POSITION_CAMERA';
+}
+
+function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCalibrationProcess }) {
+    return <div>
+        step: {cameraCalibration.currentStep} <br />
+        {
+            cameraCalibration.currentStep !== 'MOVE_TO_ORIGIN' ? null : <React.Fragment>
+                <JoggingControls />
+                <Button onClick={() => post("process/cameraCalibration/exposeCross").send()}>Expose Cross</Button>
+            </React.Fragment>
+        }{
+            cameraCalibration.currentStep !== 'EXPOSE_CROSS' ? null : <React.Fragment>
+                <SendGCode/>
+            </React.Fragment>
+        }
+        {
+            cameraCalibration.currentStep !== 'POSITION_CAMERA' ? null : <React.Fragment>
+                <JoggingControls />
+                <CameraView />
+                <Button onClick={() => post("process/cameraCalibration/applyOffset").send()}>Apply Offset</Button>
+            </React.Fragment>
+        }
+    </div>;
 }
 
 interface Process {
     printPcb: PrintPcbProcess;
-    laserCalibration: LaserCalibrationProcess
+    laserCalibration: LaserCalibrationProcess;
+    cameraCalibration: CameraCalibrationProcess;
 }
 
 export default function ProcessComponent() {
 
     return <React.Fragment>
-        <h1> Process</h1>
+        <h1> Process </h1>
+        <Button onClick={() => post("process/printPcb/launch").send()}>Launch Print PCB Process</Button>
         <WithData<Process> url="process"
             refreshMs={1000}
             render={(process) => {
-                let { printPcb, laserCalibration } = process;
+                let { printPcb, laserCalibration, cameraCalibration } = process;
                 if (printPcb !== null) return <PrintPcb printPcb={printPcb} />;
                 if (laserCalibration !== null) return <LaserCalibration laserCalibration={laserCalibration} />;
+                if (cameraCalibration !== null) return <CameraCalibration cameraCalibration={cameraCalibration} />;
 
                 return null;
             }} />
