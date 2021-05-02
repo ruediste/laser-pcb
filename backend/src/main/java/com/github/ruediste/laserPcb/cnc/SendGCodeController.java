@@ -44,9 +44,14 @@ public class SendGCodeController {
 					nextIndex++;
 				}
 
-				log.info("nextIndex: {}, size: {}", nextIndex, gCodes.size());
+				log.info("completedIndex: {} nextIndex: {}, size: {}", completedIndex, nextIndex, gCodes.size());
+
 				if (nextIndex >= gCodes.size()) {
-					log.info("Completed");
+					log.info("Sending Completed");
+				}
+
+				if (completedIndex >= gCodes.size() - 1) {
+					log.info("Processing GCodes Completed");
 					conn.gCodeCompleted.remove(gCodeSender);
 					if (onComplete != null)
 						onComplete.run();
@@ -81,7 +86,7 @@ public class SendGCodeController {
 		sendGCodes(gCodes.getGCodes(), onComplete);
 	}
 
-	public synchronized void sendGCodes(List<String> gCodes) {
+	public void sendGCodes(List<String> gCodes) {
 		sendGCodes(gCodes, null);
 	}
 
@@ -89,8 +94,8 @@ public class SendGCodeController {
 		if (gCodes.isEmpty())
 			return;
 
-		GCodeBlock block = new GCodeBlock(gCodes, onComplete);
-		block.startSending();
+		sendingBlock = new GCodeBlock(gCodes, onComplete);
+		sendingBlock.startSending();
 	}
 
 	public synchronized List<String> getLastCompletedGCodes(int n) {
@@ -111,7 +116,7 @@ public class SendGCodeController {
 		if (sendingBlock == null)
 			return List.of();
 		int from = sendingBlock.nextIndex;
-		int to = Math.max(sendingBlock.gCodes.size(), from + n);
+		int to = Math.min(sendingBlock.gCodes.size(), from + n);
 		return sendingBlock.gCodes.subList(from, to);
 	}
 }

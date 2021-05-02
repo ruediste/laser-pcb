@@ -71,6 +71,8 @@ public class ProcessRest {
 		if (profile != null) {
 			printPcbPMod.readyToProcessFiles = printPcb.canStartProcessing(profile);
 		}
+
+		printPcbPMod.userMessage = printPcb.userMessage();
 		return printPcbPMod;
 	}
 

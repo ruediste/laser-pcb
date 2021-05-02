@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.github.ruediste.laserPcb.fileUpload.FileUploadService;
 import com.github.ruediste.laserPcb.process.ProcessController;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PrintPcbInputFile;
-import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessController.InputImageData;
+import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcessController.InputFileData;
 
 @RestController
 public class PrintPcbProcessRest {
@@ -68,7 +68,7 @@ public class PrintPcbProcessRest {
 
 	@GetMapping(value = "process/printPcb/file/{id}/input{hash}.svg", produces = "image/svg+xml")
 	public String getInputSvg(@PathVariable String id, @PathVariable String hash) {
-		InputImageData imageData = ctrl.getImageData(UUID.fromString(id));
+		InputFileData imageData = ctrl.getImageData(UUID.fromString(id));
 		if (!imageData.inputSvgHash.equals(hash))
 			throw new RuntimeException("Hash mismatch");
 		return imageData.inputSvg;
@@ -76,7 +76,7 @@ public class PrintPcbProcessRest {
 
 	@GetMapping(value = "process/printPcb/file/{id}/image{hash}.svg", produces = "image/svg+xml")
 	public String getImageSvg(@PathVariable String id, @PathVariable String hash) {
-		InputImageData imageData = ctrl.getImageData(UUID.fromString(id));
+		InputFileData imageData = ctrl.getImageData(UUID.fromString(id));
 		if (!imageData.imageSvgHash.equals(hash))
 			throw new RuntimeException("Hash mismatch");
 		return imageData.imageSvg;
@@ -84,7 +84,7 @@ public class PrintPcbProcessRest {
 
 	@GetMapping(value = "process/printPcb/file/{id}/buffers{hash}.svg", produces = "image/svg+xml")
 	public String getBuffersSvg(@PathVariable String id, @PathVariable String hash) {
-		InputImageData imageData = ctrl.getImageData(UUID.fromString(id));
+		InputFileData imageData = ctrl.getImageData(UUID.fromString(id));
 		if (!imageData.buffersSvgHash.equals(hash))
 			throw new RuntimeException("Hash mismatch");
 		return imageData.buffersSvg;
@@ -93,5 +93,15 @@ public class PrintPcbProcessRest {
 	@PostMapping("process/printPcb/_processFiles")
 	public void processFiles() {
 		ctrl.startProcessFiles();
+	}
+
+	@PostMapping("process/printPcb/_startExposing")
+	public void startExposing() {
+		ctrl.startExposing();
+	}
+
+	@PostMapping("process/printPcb/_addPositionPoint")
+	public void addPositionPoint() {
+		ctrl.addPositionPoint();
 	}
 }

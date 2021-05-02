@@ -23,4 +23,6 @@ public class PrintPcbProcessPMod {
 	public List<PrintPcbInputFilePMod> processedFiles = new ArrayList<>();
 
 	public boolean readyToProcessFiles;
+
+	public String userMessage;
 }

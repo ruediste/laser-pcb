@@ -184,7 +184,7 @@ public class CncConnection {
 			isJogging = true;
 			sendGCodeImpl("G91", null); // relative positioning
 			sendGCodeImpl("G21", null); // set units to millimeters
-			sendGCodeImpl("G0 F100", null); // set feed
+			sendGCodeImpl("G0 F10000", null); // set feed
 		}
 		sendGCodeImpl(gCode, null);
 	}

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.github.ruediste.gerberLib.linAlg.CoordinatePoint;
 import com.github.ruediste.laserPcb.profile.Profile;
 
 public class PrintPcbProcess {
@@ -15,13 +16,40 @@ public class PrintPcbProcess {
 	}
 
 	public enum PrintPcbStatus {
-		INITIAL(true), PROCESSING_FILES(false), EXPOSING(true);
+		/**
+		 * The files are uploaded and parsed
+		 */
+		INITIAL,
 
-		public final boolean canStartProcessing;
+		/**
+		 * The files are processed, to create the paths used to expose the PCB
+		 */
+		PROCESSING_FILES,
 
-		private PrintPcbStatus(boolean canStartProcessing) {
-			this.canStartProcessing = canStartProcessing;
-		}
+		/**
+		 * The files are processed and ready to be exposed
+		 */
+		FILES_PROCESSED,
+		/**
+		 * Positioning the top layer
+		 */
+		POSITION_TOP,
+
+		/**
+		 * Exposing the top layer
+		 */
+		EXPOSING_TOP,
+
+		/**
+		 * Positioning the top layer
+		 */
+		POSITION_BOTTOM,
+
+		/**
+		 * Exposing the top layer
+		 */
+		EXPOSING_BOTTOM,;
+
 	}
 
 	public PrintPcbStatus status = PrintPcbStatus.INITIAL;
@@ -46,8 +74,23 @@ public class PrintPcbProcess {
 
 	public List<PrintPcbInputFile> inputFiles = new ArrayList<>();
 
+	public static class PositionPoint {
+		public PositionPoint() {
+		}
+
+		public PositionPoint(double x, double y) {
+			this.x = x;
+			this.y = y;
+		}
+
+		double x;
+		double y;
+	}
+
+	public List<CoordinatePoint> positionPoints = new ArrayList<>();
+
 	public boolean canStartProcessing(Profile profile) {
-		if (!status.canStartProcessing)
+		if (status == PrintPcbStatus.PROCESSING_FILES)
 			return false;
 
 		Map<PcbLayer, PrintPcbInputFile> fileMap = fileMap();
@@ -81,5 +124,27 @@ public class PrintPcbProcess {
 				return file;
 		}
 		throw new RuntimeException("No file with id " + id + " found");
+	}
+
+	public String userMessage() {
+		switch (status) {
+		case POSITION_TOP:
+		case POSITION_BOTTOM: {
+			String side = status == PrintPcbStatus.POSITION_TOP ? "left" : "right";
+			switch (positionPoints.size()) {
+			case 0:
+				return "Move to first point on base line";
+			case 1:
+				return "Move to second point on base line";
+			case 2:
+				return "Move to first point on " + side + " side";
+			case 3:
+				return "Move to second point on " + side + " side";
+			}
+		}
+		default:
+			break;
+		}
+		return null;
 	}
 }

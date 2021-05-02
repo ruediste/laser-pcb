@@ -24,7 +24,12 @@ public class ProcessController {
 
 	@PostConstruct
 	void init() {
-		process = repo.get();
+		try {
+			process = repo.get();
+		} catch (Exception e) {
+			log.error("Error while loading process. Creating fresh instance.", e);
+			process = null;
+		}
 		if (process == null) {
 			log.info("No persisted process found during initialization, creating new process");
 			process = new Process();

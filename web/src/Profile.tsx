@@ -129,7 +129,7 @@ export default function ProfileComponent() {
                 <InputCheck label="Single Layer PCB" value={profile.singleLayerPcb} onChange={value => editProfile.update({ singleLayerPcb: value })} />
                 <Input type="number" label="X Bed Size [mm]" value={'' + profile.bedSizeX} onChange={p => editProfile.update({ bedSizeX: parseFloat(p) })} />
                 <Input type="number" label="Y Bed Size [mm]" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
-                <Input type="number" label="Fast Movement Feed [mm/s]" value={'' + profile.fastMovementFeed} onChange={p => editProfile.update({ fastMovementFeed: parseFloat(p) })} />
+                <Input type="number" label="Fast Movement Feed [mm/m]" value={'' + profile.fastMovementFeed} onChange={p => editProfile.update({ fastMovementFeed: parseFloat(p) })} />
 
                 <Card>
                     <Card.Title >Laser</Card.Title>
@@ -140,7 +140,7 @@ export default function ProfileComponent() {
                         <Input type="number" label="Overlap between exposures (fraction of exposure width)" value={'' + profile.exposureOverlap} onChange={p => editProfile.update({ exposureOverlap: parseFloat(p) })} />
 
                         <Input type="number" label="Exposure Width [mm]" comment="temporary exposure setting" value={'' + profile.exposureWidth} onChange={p => editProfile.update({ exposureWidth: parseFloat(p) })} />
-                        <Input type="number" label="Exposure Feed [mm/s]" comment="temporary exposure setting" value={'' + profile.exposureFeed} onChange={p => editProfile.update({ exposureFeed: parseFloat(p) })} />
+                        <Input type="number" label="Exposure Feed [mm/m]" comment="temporary exposure setting" value={'' + profile.exposureFeed} onChange={p => editProfile.update({ exposureFeed: parseFloat(p) })} />
 
                         <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn: p })} />
                         <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff: p })} />

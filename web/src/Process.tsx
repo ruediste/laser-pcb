@@ -112,10 +112,11 @@ interface PrintPcbInputFile {
 }
 
 interface PrintPcbProcess {
-    status: 'INITIAL' | 'PROCESSING_FILES' | 'EXPOSING';
+    status: 'INITIAL' | 'PROCESSING_FILES' | 'FILES_PROCESSED' | 'POSITION_TOP' | 'EXPOSING_TOP' | 'POSITION_BOTTOM' | 'EXPOSING_BOTTOM';
     inputFiles: PrintPcbInputFile[];
     processedFiles: PrintPcbInputFile[];
     readyToProcessFiles: boolean;
+    userMessage: String;
 }
 
 function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
@@ -126,19 +127,20 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
         for (let file of printPcb.processedFiles) {
             // if (showImage[file.file.layer + ' image'] !== false)
             imageList.push(<img key={nr} alt="PCB" src={baseUrl + 'process/printPcb/file/' + file.file.id + '/image' + file.imageSvgHash + '.svg'}
-                style={{ width: '100%', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+                style={{ width: '100%', maxHeight: '1000px', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' image'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
 
             // if (showImage[file.file.layer + ' buffers'] !== false)
             imageList.push(<img key={nr} alt="Buffers" src={baseUrl + 'process/printPcb/file/' + file.file.id + '/buffers' + file.buffersSvgHash + '.svg'}
-                style={{ width: '100%', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
+                style={{ width: '100%', maxHeight: '1000px', position: (nr++) === 0 ? 'relative' : 'absolute', left: 0, top: 0, display: showImage[file.file.layer + ' buffers'] !== false ? undefined : 'none', shapeRendering: 'optimizeSpeed' }} />)
         }
     }
     return <React.Fragment>
-        {printPcb.status}
+        {printPcb.status} {printPcb.userMessage}
         <h1> Gerber Files</h1>
         <GerberFiles uploadedFiles={printPcb.inputFiles} />
         <Button disabled={!printPcb.readyToProcessFiles} onClick={() => post("process/printPcb/_processFiles").success('Process Files triggered').send()}>Process Files</Button><br />
-        {printPcb.status !== 'EXPOSING' ? null : <React.Fragment>
+        {printPcb.status !== 'FILES_PROCESSED' ? null : <React.Fragment>
+            <Button onClick={() => post("process/printPcb/_startExposing").success('Start Exposing triggered').send()}>Start Exposing</Button><br />
             {printPcb.processedFiles.map((file, idx) => <React.Fragment key={idx}>
                 <InputCheck style={{ display: 'inline-block' }} label={file.file.layer + ' image'} value={showImage[file.file.layer + ' image'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' image']: v } })} />{' '}
                 <InputCheck style={{ display: 'inline-block' }} label={file.file.layer + ' buffers'} value={showImage[file.file.layer + ' buffers'] !== false} onChange={v => setShowImage({ ...showImage, ...{ [file.file.layer + ' buffers']: v } })} />{' '}
@@ -146,6 +148,15 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
             <div style={{ position: 'relative' }}>
                 {imageList}
             </div>
+        </React.Fragment>}
+
+        {printPcb.status !== 'POSITION_TOP' && printPcb.status !== 'POSITION_BOTTOM' ? null : <React.Fragment>
+            <JoggingControls />
+            <CameraView />
+            <Button onClick={() => post("process/printPcb/_addPositionPoint").send()}>Add Positioning Point</Button>
+        </React.Fragment>}
+        {printPcb.status !== 'EXPOSING_TOP' && printPcb.status !== 'EXPOSING_BOTTOM' ? null : <React.Fragment>
+            <SendGCode />
         </React.Fragment>}
     </React.Fragment>
 }
@@ -177,7 +188,7 @@ function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCal
             </React.Fragment>
         }{
             cameraCalibration.currentStep !== 'EXPOSE_CROSS' ? null : <React.Fragment>
-                <SendGCode/>
+                <SendGCode />
             </React.Fragment>
         }
         {

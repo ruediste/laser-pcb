@@ -1,5 +1,6 @@
 package com.github.ruediste.laserPcb.process.printPcb;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 import java.awt.BasicStroke;
@@ -7,10 +8,6 @@ import java.awt.Color;
 import java.awt.Shape;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Rectangle2D;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -36,8 +33,13 @@ import org.locationtech.jts.awt.ShapeWriter;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryCollection;
+import org.locationtech.jts.geom.GeometryFilter;
+import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.util.AffineTransformation;
+import org.locationtech.jts.geom.util.AffineTransformationBuilder;
 import org.locationtech.jts.operation.overlay.OverlayOp;
 import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
 import org.slf4j.Logger;
@@ -49,11 +51,18 @@ import com.github.ruediste.gerberLib.WarningCollector;
 import com.github.ruediste.gerberLib.jts.JtsAdapter;
 import com.github.ruediste.gerberLib.jts.MoveGenerator;
 import com.github.ruediste.gerberLib.jts.MoveHandler;
+import com.github.ruediste.gerberLib.linAlg.CoordinatePoint;
+import com.github.ruediste.gerberLib.linAlg.CoordinateVector;
 import com.github.ruediste.gerberLib.parser.GerberParser;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter.Attribute;
 import com.github.ruediste.gerberLib.readGeometricPrimitive.GerberReadGeometricPrimitiveAdapter;
+import com.github.ruediste.laserPcb.Var;
+import com.github.ruediste.laserPcb.cnc.CncConnection.CncState;
+import com.github.ruediste.laserPcb.cnc.CncConnectionAppController;
+import com.github.ruediste.laserPcb.cnc.SendGCodeController;
 import com.github.ruediste.laserPcb.fileUpload.FileUploadService;
+import com.github.ruediste.laserPcb.gCode.GCodeWriter;
 import com.github.ruediste.laserPcb.process.ProcessController;
 import com.github.ruediste.laserPcb.process.ProcessRepository;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
@@ -77,14 +86,20 @@ public class PrintPcbProcessController {
 	ProfileRepository profileRepo;
 
 	@Autowired
-	ProcessController processAppCtrl;
+	ProcessController processCtrl;
+
+	@Autowired
+	CncConnectionAppController connCtrl;
+
+	@Autowired
+	SendGCodeController sendGCodeController;
 
 	private ExecutorService executor = Executors.newCachedThreadPool();
 
 	@PostConstruct
 	void init() {
 		ArrayList<CompletableFuture<?>> tasks = new ArrayList<>();
-		processAppCtrl.update(process -> {
+		processCtrl.update(process -> {
 			if (process.printPcb != null) {
 				process.printPcb.status = PrintPcbStatus.INITIAL;
 				for (var file : process.printPcb.inputFiles) {
@@ -96,7 +111,7 @@ public class PrintPcbProcessController {
 
 		CompletableFuture.allOf(tasks.toArray(new CompletableFuture[] {})).thenRunAsync(() -> {
 			Profile current = profileRepo.getCurrent();
-			var process = processAppCtrl.get().printPcb;
+			var process = processCtrl.get().printPcb;
 			if (process != null && current != null && process.canStartProcessing(current))
 				startProcessFiles();
 		});
@@ -108,7 +123,7 @@ public class PrintPcbProcessController {
 	}
 
 	public PrintPcbProcess get() {
-		var process = processAppCtrl.get();
+		var process = processCtrl.get();
 		if (process.printPcb == null)
 			throw new RuntimeException("PrintPCB process not active");
 
@@ -116,7 +131,7 @@ public class PrintPcbProcessController {
 	}
 
 	public void update(Consumer<PrintPcbProcess> updater) {
-		processAppCtrl.update(process -> {
+		processCtrl.update(process -> {
 			if (process.printPcb == null)
 				throw new RuntimeException("PrintPCB process not active");
 			updater.accept(process.printPcb);
@@ -129,7 +144,10 @@ public class PrintPcbProcessController {
 		executor.submit(() -> parse(file));
 	}
 
-	public static class InputImageData {
+	/**
+	 * In-Memory data for an input file.
+	 */
+	public static class InputFileData {
 		public Geometry image;
 		public String inputSvg;
 
@@ -143,7 +161,7 @@ public class PrintPcbProcessController {
 		public String inputSvgHash;
 	}
 
-	ConcurrentHashMap<UUID, InputImageData> imageData = new ConcurrentHashMap<>();
+	ConcurrentHashMap<UUID, InputFileData> fileData = new ConcurrentHashMap<>();
 
 	private void parse(PrintPcbInputFile file) {
 		try {
@@ -158,7 +176,7 @@ public class PrintPcbProcessController {
 				log.info("Warnings while processing {}:\n{}", file.name, warningCollector);
 			}
 			ShapeWriter writer = new ShapeWriter();
-			InputImageData data = new InputImageData();
+			InputFileData data = new InputFileData();
 			data.image = jtsAdapter.image();
 			Shape imageShape = writer.toShape(data.image);
 			Rectangle2D bounds = imageShape.getBounds2D();
@@ -193,7 +211,7 @@ public class PrintPcbProcessController {
 							file.layer = PcbLayer.BOTTOM;
 					}
 				}
-				imageData.put(file.id, data);
+				fileData.put(file.id, data);
 				file.status = InputFileStatus.PARSED;
 				file.errorMessage = null;
 			});
@@ -207,12 +225,12 @@ public class PrintPcbProcessController {
 	}
 
 	public void removeFile(UUID id) {
-		imageData.remove(id);
+		fileData.remove(id);
 		update(process -> process.inputFiles.removeIf(file -> file.id.equals(id)));
 	}
 
-	public InputImageData getImageData(UUID id) {
-		return imageData.get(id);
+	public InputFileData getImageData(UUID id) {
+		return fileData.get(id);
 	}
 
 	public void startProcessFiles() {
@@ -228,7 +246,7 @@ public class PrintPcbProcessController {
 			for (var file : process.inputFiles) {
 				if (!file.status.canStartProcessing)
 					continue;
-				InputImageData data = imageData.get(file.id);
+				InputFileData data = fileData.get(file.id);
 				if (data == null)
 					continue;
 				if (data.image == null)
@@ -255,7 +273,7 @@ public class PrintPcbProcessController {
 		allFiles.whenCompleteAsync((r, t) -> {
 			update(p -> {
 				if (t == null)
-					p.status = PrintPcbStatus.EXPOSING;
+					p.status = PrintPcbStatus.FILES_PROCESSED;
 				else {
 					log.error("Error while processing", t);
 					p.status = PrintPcbStatus.INITIAL;
@@ -265,7 +283,7 @@ public class PrintPcbProcessController {
 		}, executor);
 	}
 
-	Rectangle2D combinedBounds;
+	private Rectangle2D combinedBounds;
 
 	private int combinedSvgTargetWidth;
 
@@ -273,7 +291,33 @@ public class PrintPcbProcessController {
 
 	private int combinedSvgTargetHeight;
 
-	private void processFile(PrintPcbInputFile file, InputImageData data, Profile currentProfile) {
+	private Geometry dropNon2D(Geometry input) {
+		if (input instanceof GeometryCollection) {
+			boolean filter = false;
+			for (int i = 0; i < input.getNumGeometries(); i++) {
+				if (input.getGeometryN(i).getDimension() != 2) {
+					filter = true;
+					break;
+				}
+			}
+			if (filter) {
+				ArrayList<Polygon> geometries = new ArrayList<>();
+				for (int i = 0; i < input.getNumGeometries(); i++) {
+					Geometry geometryN = input.getGeometryN(i);
+					if (geometryN instanceof Polygon) {
+						geometries.add((Polygon) geometryN);
+					}
+				}
+				if (geometries.isEmpty())
+					return new MultiPolygon(null, input.getFactory());
+				else
+					return new MultiPolygon(geometries.toArray(new Polygon[] {}), input.getFactory());
+			}
+		}
+		return input;
+	}
+
+	private void processFile(PrintPcbInputFile file, InputFileData data, Profile currentProfile) {
 		try {
 
 			double toolDiameter = currentProfile.exposureWidth;
@@ -285,14 +329,23 @@ public class PrintPcbProcessController {
 			Geometry remaining;
 			{
 
-				// do first buffer
+				// do first buffer, place the first tool path half the tool diameter to the
+				// inside
 				Geometry buffer = image.buffer(-toolDiameter / 2);
 				if (!buffer.isEmpty())
 					buffers.add(buffer);
 
 				// remove the area covered by first buffer, to avoid having outermost remaining
 				// areas filled
-				remaining = image.buffer(-toolDiameter);
+				// remaining = image.buffer(-toolDiameter);
+
+				remaining = image;
+				{
+					Geometry areaCoveredByTool = buffer.getBoundary().buffer(1.01 * toolDiameter / 2); // factor for
+																										// numerical
+																										// stability
+					remaining = dropNon2D(OverlayNGRobust.overlay(remaining, areaCoveredByTool, OverlayOp.DIFFERENCE));
+				}
 
 				// remaining buffers
 				while (true) {
@@ -300,13 +353,33 @@ public class PrintPcbProcessController {
 					if (buffer.isEmpty())
 						break;
 					buffers.add(buffer);
-					remaining = OverlayNGRobust.overlay(remaining, buffer.getBoundary().buffer(toolDiameter / 2),
-							OverlayOp.DIFFERENCE);
+
+					Geometry areaCoveredByTool = buffer.getBoundary().buffer(1.01 * toolDiameter / 2);
+					try {
+						remaining = dropNon2D(
+								OverlayNGRobust.overlay(remaining, areaCoveredByTool, OverlayOp.DIFFERENCE));
+					} catch (Exception e) {
+						log.error("Error while updating remaining area", e);
+						remaining.apply(new GeometryFilter() {
+
+							@Override
+							public void filter(Geometry geom) {
+								log.info("Remaining  dim {}: {}", geom.getDimension(), geom);
+							}
+						});
+
+						areaCoveredByTool.apply(new GeometryFilter() {
+
+							@Override
+							public void filter(Geometry geom) {
+								log.info("Area covered by tool dim {}: {}", geom.getDimension(), geom);
+							}
+						});
+					}
 				}
 
 				// fill the remaining areas
 				while (!remaining.isEmpty()) {
-					log.info("cls: {}", remaining.getClass());
 					Geometry newRemaining = remaining;
 					var nonCovered = new ArrayList<Geometry>();
 					for (int n = 0; n < remaining.getNumGeometries(); n++) {
@@ -314,15 +387,15 @@ public class PrintPcbProcessController {
 						Envelope envelope = g.getEnvelopeInternal();
 						if (envelope.getDiameter() < toolDiameter) {
 							buffers.add(image.getFactory().createPoint(envelope.centre()));
-							// TODO: replace by circle
-							newRemaining = OverlayNGRobust.overlay(newRemaining, g.getEnvelope(), OverlayOp.DIFFERENCE);
+							newRemaining = dropNon2D(
+									OverlayNGRobust.overlay(newRemaining, g.getEnvelope(), OverlayOp.DIFFERENCE));
 							continue;
 						}
 						if (g instanceof Polygon) {
 							Polygon p = (Polygon) g;
 							buffers.add(p);
-							newRemaining = OverlayNGRobust.overlay(newRemaining,
-									p.getBoundary().buffer(toolDiameter / 2), OverlayOp.DIFFERENCE);
+							newRemaining = dropNon2D(OverlayNGRobust.overlay(newRemaining,
+									p.getBoundary().buffer(toolDiameter / 2), OverlayOp.DIFFERENCE));
 						}
 						nonCovered.add(g);
 					}
@@ -422,37 +495,164 @@ public class PrintPcbProcessController {
 		return svg;
 	}
 
-	private void generateGCode(InputImageData data, ArrayList<Geometry> buffers) throws IOException {
-		WarningCollector warningCollector = new WarningCollector();
-		var ncStream = new ByteArrayOutputStream();
-		try (var out = new OutputStreamWriter(ncStream, StandardCharsets.UTF_8)) {
+	public void startExposing() {
+		update(p -> {
+			if (p.status != PrintPcbStatus.FILES_PROCESSED)
+				throw new RuntimeException("Cannot start exposing in status " + p.status);
+			p.status = PrintPcbStatus.POSITION_TOP;
+			p.positionPoints.clear();
 
-			out.append("G0 F1000\nG1 F100\n");
-			MoveGenerator moveGenerator = new MoveGenerator(warningCollector, new MoveHandler() {
-
-				@Override
-				public void moveTo(Coordinate coordinate) {
-					try {
-						out.append(String.format("G0 X%.2f Y%.2f\n", coordinate.x, coordinate.y));
-					} catch (IOException e) {
-						throw new RuntimeException(e);
-					}
-				}
-
-				@Override
-				public void lineTo(Coordinate coordinate) {
-					try {
-						out.append(String.format("G1 X%.2f Y%.2f\n", coordinate.x, coordinate.y));
-					} catch (IOException e) {
-						throw new RuntimeException(e);
-					}
-				}
+		});
+		// testing only
+		if (false) {
+			update(p -> {
+				p.positionPoints.addAll(List.of(CoordinatePoint.of(1, 0), CoordinatePoint.of(2, 0),
+						CoordinatePoint.of(0, 1), CoordinatePoint.of(0, 2)));
+				p.status = PrintPcbStatus.EXPOSING_TOP;
 			});
-
-			buffers.forEach(moveGenerator::add);
-			moveGenerator.generateMoves(new Coordinate(0, 0));
+			sendExposingCommands(PcbLayer.TOP);
 		}
-		byte[] gCode = ncStream.toByteArray();
+	}
+
+	public void addPositionPoint() {
+		CncState state = connCtrl.getConnection().getState();
+		Profile profile = profileRepo.getCurrent();
+		CoordinatePoint point = new CoordinatePoint(state.x + profile.cameraOffsetX, state.y + profile.cameraOffsetY);
+		Var<Runnable> action = Var.of();
+		update(p -> {
+			if (p.status != PrintPcbStatus.POSITION_TOP && p.status != PrintPcbStatus.POSITION_BOTTOM)
+				throw new RuntimeException("Cannot add position point in status " + p.status);
+			if (p.positionPoints.size() >= 4)
+				throw new RuntimeException("Cannot more position points");
+			p.positionPoints.add(point);
+			if (p.positionPoints.size() >= 4) {
+				switch (p.status) {
+				case POSITION_TOP:
+					p.status = PrintPcbStatus.EXPOSING_TOP;
+					action.set(() -> sendExposingCommands(PcbLayer.TOP));
+					break;
+				case POSITION_BOTTOM:
+					p.status = PrintPcbStatus.EXPOSING_BOTTOM;
+					action.set(() -> sendExposingCommands(PcbLayer.BOTTOM));
+					break;
+				default:
+					throw new UnsupportedOperationException();
+				}
+			}
+		});
+		if (action.get() != null)
+			action.get().run();
+	}
+
+	private void sendExposingCommands(PcbLayer layer) {
+		PrintPcbProcess process = get();
+		PrintPcbInputFile file = process.fileMap().get(layer);
+		InputFileData data = this.fileData.get(file.id);
+
+		// determine coordinate transformation
+		AffineTransformation transformation = calculateTransformation(layer, process.positionPoints, data.imageBounds);
+		if (transformation == null) {
+			update(p -> {
+				p.status = PrintPcbStatus.FILES_PROCESSED;
+				p.positionPoints.clear();
+			});
+			throw new RuntimeException("Error while calculating transformation");
+		}
+		log.info("Image Bounds: {}, Transformation: {}", data.imageBounds, transformation);
+
+		// generate and send gcode
+		List<String> gCode = generateGCode(data, transformation);
+		log.info("Exposing G code for {}: \n{}", layer, gCode.stream().collect(joining("\n")));
+
+		sendGCodeController.sendGCodes(gCode, () -> {
+			update(p -> {
+				p.positionPoints.clear();
+				if (p.status == PrintPcbStatus.EXPOSING_BOTTOM || profileRepo.getCurrent().singleLayerPcb)
+					p.status = PrintPcbStatus.FILES_PROCESSED;
+				else
+					p.status = PrintPcbStatus.POSITION_BOTTOM;
+			});
+		});
+	}
+
+	AffineTransformation calculateTransformation(PcbLayer layer, List<CoordinatePoint> points,
+			Rectangle2D imageBounds) {
+		AffineTransformation transformation;
+		CoordinatePoint origin = CoordinatePoint.lineIntersection(points.get(0), points.get(1), points.get(2),
+				points.get(3));
+		if (Double.isNaN(origin.x) || Double.isNaN(origin.y)) {
+			return null;
+		}
+		double d0 = origin.vectorTo(points.get(0)).length2();
+		double d1 = origin.vectorTo(points.get(1)).length2();
+
+		CoordinateVector vBase;
+		if (d0 < d1) {
+			vBase = points.get(0).vectorTo(points.get(1)).normalize();
+		} else
+			vBase = points.get(1).vectorTo(points.get(0)).normalize();
+
+		if (layer == PcbLayer.TOP)
+			transformation = new AffineTransformationBuilder(
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY()),
+					new Coordinate(imageBounds.getMinX() + 1, imageBounds.getMinY()),
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY() + 1), toCoordinate(origin),
+					toCoordinate(origin.plus(vBase)), toCoordinate(origin.plus(vBase.normal()))).getTransformation();
+		else
+			transformation = new AffineTransformationBuilder(
+					new Coordinate(imageBounds.getMaxX(), imageBounds.getMaxY()),
+					new Coordinate(imageBounds.getMaxX() - 1, imageBounds.getMaxY()),
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMaxY() - 1), toCoordinate(origin),
+					toCoordinate(origin.plus(vBase)), toCoordinate(origin.plus(vBase.normal().negate())))
+							.getTransformation();
+		return transformation;
+	}
+
+	private Coordinate toCoordinate(CoordinatePoint origin) {
+		return new Coordinate(origin.x, origin.y);
+	}
+
+	private List<String> generateGCode(InputFileData data, AffineTransformation transformation) {
+		Profile profile = profileRepo.getCurrent();
+		WarningCollector warningCollector = new WarningCollector();
+		var gCodes = new GCodeWriter();
+		gCodes.add("G90"); // absolute positioning
+		gCodes.add("G21"); // set units to millimeters
+		gCodes.g0(profile.fastMovementFeed);
+		gCodes.g1(profile.exposureFeed);
+
+		gCodes.g0(null, null, profile.laserZ, null); // go to the right height
+
+		MoveGenerator moveGenerator = new MoveGenerator(warningCollector, new MoveHandler() {
+
+			boolean laserOn;
+
+			@Override
+			public void moveTo(Coordinate raw) {
+				Coordinate transformed = new Coordinate();
+				transformation.transform(raw, transformed);
+				if (laserOn) {
+					gCodes.add(profile.laserOff);
+					laserOn = false;
+				}
+				gCodes.g0(transformed.x, transformed.y);
+			}
+
+			@Override
+			public void lineTo(Coordinate raw) {
+				Coordinate transformed = new Coordinate();
+				transformation.transform(raw, transformed);
+				if (!laserOn) {
+					gCodes.add(profile.laserOn);
+					laserOn = true;
+				}
+				gCodes.g1(transformed.x, transformed.y);
+			}
+		});
+
+		data.buffers.forEach(moveGenerator::add);
+		moveGenerator.generateMoves(new Coordinate(0, 0));
+		return gCodes.getGCodes();
 	}
 
 }

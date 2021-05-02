@@ -1,7 +1,5 @@
 package com.github.ruediste.laserPcb;
 
-import java.util.function.Consumer;
-
 public class Var<T> {
 
 	public T value;
@@ -26,7 +24,7 @@ public class Var<T> {
 		return new Var<>(value);
 	}
 
-	public static Var<Consumer<Void>> of() {
+	public static <T> Var<T> of() {
 		return new Var<>();
 	}
 }
