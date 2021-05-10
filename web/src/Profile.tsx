@@ -52,17 +52,19 @@ interface Profile {
     laserDotSize: number;
     laserZ: number;
     exposureOverlap: number;
-    
+    baudRate: number;
+
     exposureWidth: number;
     exposureFeed: number;
     fastMovementFeed: number;
-    
+
     laserOn: string;
     laserOff: string;
 
     bedSizeX: number;
     bedSizeY: number;
 
+    cameraRotation: number;
     cameraOffsetX: number;
     cameraOffsetY: number;
 
@@ -130,6 +132,7 @@ export default function ProfileComponent() {
                 <Input type="number" label="X Bed Size [mm]" value={'' + profile.bedSizeX} onChange={p => editProfile.update({ bedSizeX: parseFloat(p) })} />
                 <Input type="number" label="Y Bed Size [mm]" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
                 <Input type="number" label="Fast Movement Feed [mm/m]" value={'' + profile.fastMovementFeed} onChange={p => editProfile.update({ fastMovementFeed: parseFloat(p) })} />
+                <Input type="number" label="Baud Rate (115200, 250000)" value={'' + profile.baudRate} onChange={p => editProfile.update({ baudRate: parseInt(p) })} />
 
                 <Card>
                     <Card.Title >Laser</Card.Title>
@@ -150,6 +153,10 @@ export default function ProfileComponent() {
                 <Card>
                     <Card.Title >Camera</Card.Title>
                     <Card.Body>
+                        {[0, 90, 180, 270].map((v, idx) => <div key={idx} className="form-check form-check-inline">
+                            <input className="form-check-input" type="radio" name="flexRadioDefault" id={"cameraRotate" + idx} checked={profile.cameraRotation === v} onChange={p => editProfile.update({ cameraRotation: v })} />
+                            <label className="form-check-label" htmlFor={"cameraRotate" + idx}>Camera Rotation {v}</label>
+                        </div>)}
                         <Input type="number" label="CameraOffset X [mm]" value={'' + profile.cameraOffsetX} onChange={p => editProfile.update({ cameraOffsetX: parseFloat(p) })} />
                         <Input type="number" label="CameraOffset Y [mm]" value={'' + profile.cameraOffsetY} onChange={p => editProfile.update({ cameraOffsetY: parseFloat(p) })} />
                         <Button onClick={() => post("process/cameraCalibration/start").error("Error while starting calibration").success(() => history.push("/process")).send()}>

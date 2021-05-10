@@ -47,7 +47,7 @@ public class CameraCalibrationRest {
 			cameraCalibration.crossX = state.x + 5;
 			cameraCalibration.crossY = state.y;
 		});
-		ctrl.sendGCodes(service.buildExposeCrossGCode(), () -> processAppController
+		ctrl.sendGCodes(service.buildExposeCrossGCode()).thenRun(() -> processAppController
 				.update(p -> p.cameraCalibration.currentStep = CameraCalibrationStep.POSITION_CAMERA));
 	}
 

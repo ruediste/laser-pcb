@@ -21,9 +21,9 @@ public class CncConnectionAppController {
 	private CncConnection connection;
 	private ScheduledFuture<?> stateFuture;
 
-	public synchronized void connect(Path serialDev) {
+	public synchronized void connect(Path serialDev, int baudRate) {
 		disconnect();
-		connection = new CncConnection(new SerialConnection(serialDev.toAbsolutePath().toString()));
+		connection = new CncConnection(new SerialConnection(serialDev.toAbsolutePath().toString(), baudRate));
 		stateFuture = executor.scheduleWithFixedDelay(() -> connection.queryStatus(), 500, 2000, TimeUnit.MILLISECONDS);
 	}
 

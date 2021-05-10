@@ -1,6 +1,7 @@
 package com.github.ruediste.laserPcb.cnc;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -23,11 +24,12 @@ public class SendGCodeController {
 		private CncConnection conn;
 		private Consumer<Void> gCodeSender = x -> sendGCode();
 		public boolean sending;
-		public Runnable onComplete;
+		public boolean cancelled;
+		private CompletableFuture<Void> future;
 
-		public GCodeBlock(List<String> gCodes, Runnable onComplete) {
+		public GCodeBlock(List<String> gCodes, CompletableFuture<Void> future) {
 			this.gCodes = gCodes;
-			this.onComplete = onComplete;
+			this.future = future;
 			conn = connCtrl.getConnection();
 		}
 
@@ -44,17 +46,17 @@ public class SendGCodeController {
 					nextIndex++;
 				}
 
-				log.info("completedIndex: {} nextIndex: {}, size: {}", completedIndex, nextIndex, gCodes.size());
-
-				if (nextIndex >= gCodes.size()) {
-					log.info("Sending Completed");
-				}
-
-				if (completedIndex >= gCodes.size() - 1) {
-					log.info("Processing GCodes Completed");
+				if (cancelled) {
+					log.info("Processing GCodes cancelled");
+					future.cancel(true);
 					conn.gCodeCompleted.remove(gCodeSender);
-					if (onComplete != null)
-						onComplete.run();
+
+					sending = false;
+
+				} else if (completedIndex >= gCodes.size() - 1) {
+					log.info("Processing GCodes completed");
+					conn.gCodeCompleted.remove(gCodeSender);
+					future.complete(null);
 					sending = false;
 				}
 
@@ -78,24 +80,18 @@ public class SendGCodeController {
 		return sendingBlock == null || sendingBlock.isComplete();
 	}
 
-	public void sendGCodes(GCodeWriter gCodes) {
-		sendGCodes(gCodes, null);
+	public CompletableFuture<Void> sendGCodes(GCodeWriter gCodes) {
+		return sendGCodes(gCodes.getGCodes());
 	}
 
-	public void sendGCodes(GCodeWriter gCodes, Runnable onComplete) {
-		sendGCodes(gCodes.getGCodes(), onComplete);
-	}
-
-	public void sendGCodes(List<String> gCodes) {
-		sendGCodes(gCodes, null);
-	}
-
-	public synchronized void sendGCodes(List<String> gCodes, Runnable onComplete) {
+	public synchronized CompletableFuture<Void> sendGCodes(List<String> gCodes) {
 		if (gCodes.isEmpty())
-			return;
+			return CompletableFuture.completedFuture(null);
 
-		sendingBlock = new GCodeBlock(gCodes, onComplete);
+		CompletableFuture<Void> future = new CompletableFuture<>();
+		sendingBlock = new GCodeBlock(gCodes, future);
 		sendingBlock.startSending();
+		return future;
 	}
 
 	public synchronized List<String> getLastCompletedGCodes(int n) {
@@ -107,16 +103,20 @@ public class SendGCodeController {
 	}
 
 	public synchronized List<String> getInFlightGCodes() {
-		if (sendingBlock == null)
+		if (sendingBlock == null || sendingBlock.sending == false)
 			return List.of();
 		return sendingBlock.gCodes.subList(sendingBlock.completedIndex + 1, sendingBlock.nextIndex);
 	}
 
 	public synchronized List<String> getNextGCdes(int n) {
-		if (sendingBlock == null)
+		if (sendingBlock == null || sendingBlock.sending == false)
 			return List.of();
 		int from = sendingBlock.nextIndex;
 		int to = Math.min(sendingBlock.gCodes.size(), from + n);
 		return sendingBlock.gCodes.subList(from, to);
+	}
+
+	public synchronized void cancel() {
+		sendingBlock.cancelled = true;
 	}
 }

@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.github.ruediste.laserPcb.profile.ProfileRepository;
+
 @RestController
 public class CncConnectionRest {
 
@@ -26,6 +28,9 @@ public class CncConnectionRest {
 
 	@Autowired
 	CncConnectionAppController connCtrl;
+
+	@Autowired
+	ProfileRepository profileRepo;
 
 	public static class CncConnectionState {
 		public String selectedSerialConnection;
@@ -91,7 +96,7 @@ public class CncConnectionRest {
 
 	@PostMapping("cncConnection/_connect")
 	void connect() {
-		connCtrl.connect(Paths.get(selectedSerialRepo.get()));
+		connCtrl.connect(Paths.get(selectedSerialRepo.get()), profileRepo.getCurrent().baudRate);
 	}
 
 	@PostMapping("cncConnection/_disconnect")
@@ -100,21 +105,22 @@ public class CncConnectionRest {
 	}
 
 	@PostMapping("cncConnection/_jog")
-	void jog(@RequestParam String direction) {
+	void jog(@RequestParam String direction, @RequestParam double distance) {
+		System.out.println(distance);
 		if ("X-".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 X-1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 X%.2f", -distance));
 		if ("X+".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 X1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 X%.2f", distance));
 
 		if ("Y-".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 Y-1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 Y%.2f", -distance));
 		if ("Y+".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 Y1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 Y%.2f", distance));
 
 		if ("Z-".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 Z-1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 Z%.2f", -distance));
 		if ("Z+".equals(direction))
-			connCtrl.getConnection().sendGCodeForJog("G0 Z1");
+			connCtrl.getConnection().sendGCodeForJog(String.format("G0 Z%.2f", distance));
 	}
 
 	@PostMapping("cncConnection/_autoHome")

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.github.ruediste.laserPcb.cnc.CncConnection.CncState;
@@ -28,7 +29,7 @@ public class SendGCodeRest {
 	CncConnectionAppController connCtrl;
 
 	@GetMapping("sendGCode")
-	SendGCodeStatus status() {
+	public SendGCodeStatus status() {
 		SendGCodeStatus s = new SendGCodeStatus();
 		s.lastCompletedGCodes = ctrl.getLastCompletedGCodes(5);
 		s.inFlightGCodes = ctrl.getInFlightGCodes();
@@ -39,5 +40,10 @@ public class SendGCodeRest {
 			s.state = con.getState();
 		}
 		return s;
+	}
+
+	@PostMapping("sendGCode/_cancel")
+	public void cancel() {
+		ctrl.cancel();
 	}
 }

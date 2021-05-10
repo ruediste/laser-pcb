@@ -23,12 +23,12 @@ public class SerialConnection {
 
 	public final String port;
 
-	public SerialConnection(String port) {
+	public SerialConnection(String port, int baudRate) {
 		this.port = port;
 		log.info("Opening {}", port);
 		commPort = SerialPort.getCommPort(port);
 //		commPort.setBaudRate(115200);
-		commPort.setBaudRate(250000);
+		commPort.setBaudRate(baudRate);
 		commPort.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 1000, 1000);
 		commPort.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
 		commPort.setNumDataBits(8);
@@ -110,7 +110,7 @@ public class SerialConnection {
 		}
 	}
 
-	public void sendBytes(byte[] tx) {
+	public synchronized void sendBytes(byte[] tx) {
 		int l = 0;
 		while (true) {
 

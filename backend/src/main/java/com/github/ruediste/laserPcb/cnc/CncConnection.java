@@ -1,5 +1,7 @@
 package com.github.ruediste.laserPcb.cnc;
 
+import static java.util.stream.Collectors.joining;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -8,7 +10,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -46,7 +47,7 @@ public class CncConnection {
 	}
 
 	private Deque<InFlightGCode> inFlightGCodes = new ArrayDeque<>();
-	int controllerReceiveBufferSize = 128;
+	int controllerReceiveBufferSize = 96;
 
 	public CncConnection(SerialConnection con) {
 		this.con = con;
@@ -71,6 +72,7 @@ public class CncConnection {
 				if (ch == '\n') {
 					String line = sb.toString();
 					sb.setLength(0);
+					log.info("Received {}", line);
 
 					if (!connectionOpened) {
 						if (line.startsWith("Grbl")) {
@@ -150,11 +152,17 @@ public class CncConnection {
 	 */
 	public boolean sendGCodeNonBlocking(String gCode, Runnable onCompletion) {
 		gCode = removeTrailingNewlines(gCode);
-		log.info("Sending {}", gCode);
+		if (gCode.trim().isEmpty()) {
+			if (onCompletion != null)
+				onCompletion.run();
+			return true;
+		}
+
 		byte[] bb = (gCode + "\n").getBytes(StandardCharsets.UTF_8);
 
+		int totalSize;
 		synchronized (lock) {
-			int totalSize = totalInFlightGCodeSize();
+			totalSize = totalInFlightGCodeSize();
 			totalSize += bb.length;
 			if (totalSize < controllerReceiveBufferSize) {
 				inFlightGCodes.addLast(new InFlightGCode(bb, gCode, onCompletion));
@@ -163,6 +171,7 @@ public class CncConnection {
 
 		}
 
+		log.info("Sending {}, inFlight: {}", gCode, totalSize);
 		con.sendBytes(bb);
 		return true;
 	}
@@ -189,8 +198,14 @@ public class CncConnection {
 		sendGCodeImpl(gCode, null);
 	}
 
-	public void sendGCodeImpl(String gCode, Runnable onCompletion) {
+	private void sendGCodeImpl(String gCode, Runnable onCompletion) {
 		gCode = removeTrailingNewlines(gCode);
+		if (gCode.trim().isEmpty()) {
+			if (onCompletion != null)
+				onCompletion.run();
+			return;
+		}
+
 		log.info("Sending {}", gCode);
 		byte[] bb = (gCode + "\n").getBytes(StandardCharsets.UTF_8);
 
@@ -262,7 +277,7 @@ public class CncConnection {
 			return;
 
 		try {
-			statusPending.tryAcquire(2, TimeUnit.SECONDS);
+			statusPending.acquire();
 			// after two seconds just ignore the locked semaphore
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
@@ -278,6 +293,9 @@ public class CncConnection {
 			break;
 		default:
 			throw new UnsupportedOperationException();
+		}
+		synchronized (lock) {
+			log.info("In flight GCodes: {}", inFlightGCodes.stream().map(x -> x.gCodeString).collect(joining(",")));
 		}
 		sendGCode(gCode, () -> {
 			if (statusPending.availablePermits() == 0)

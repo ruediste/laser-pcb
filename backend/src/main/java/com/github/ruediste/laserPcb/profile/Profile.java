@@ -11,6 +11,10 @@ public class Profile extends EntityBase {
 	public double laserDotSize;
 	public double laserZ;
 
+	public int cameraRotation;
+
+	public int baudRate;
+
 	/**
 	 * overlap between exposures (fraction of exposure width)
 	 */

@@ -28,7 +28,7 @@ public class PrintPcbProcessControllerTest {
 				CoordinatePoint.of(3, 6), CoordinatePoint.of(3, 7));
 		Rectangle2D bounds = new Rectangle2D.Double(10, 15, 100, 200);
 
-		AffineTransformation t = ctrl.calculateTransformation(PcbLayer.TOP, points, bounds);
+		AffineTransformation t = ctrl.service.calculateTransformation(PcbLayer.TOP, points, bounds);
 
 		check(t, 10, 215, 3, 4);
 		check(t, 20, 215, 13, 4);
