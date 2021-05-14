@@ -21,10 +21,19 @@ public class CncConnectionAppController {
 	private CncConnection connection;
 	private ScheduledFuture<?> stateFuture;
 
+	private volatile boolean statusQueryEnabled = true;
+
 	public synchronized void connect(Path serialDev, int baudRate) {
 		disconnect();
 		connection = new CncConnection(new SerialConnection(serialDev.toAbsolutePath().toString(), baudRate));
-		stateFuture = executor.scheduleWithFixedDelay(() -> connection.queryStatus(), 500, 2000, TimeUnit.MILLISECONDS);
+		stateFuture = executor.scheduleWithFixedDelay(() -> {
+			if (statusQueryEnabled)
+				connection.queryStatus();
+		}, 1000, 2000, TimeUnit.MILLISECONDS);
+	}
+
+	public void setStatusQueryEnabled(boolean enabled) {
+		statusQueryEnabled = enabled;
 	}
 
 	public synchronized void disconnect() {

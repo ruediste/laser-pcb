@@ -1,5 +1,11 @@
 package com.github.ruediste.laserPcb.gCode;
 
+import static java.util.stream.Collectors.joining;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +39,13 @@ public class GCodeWriter {
 	 */
 	public GCodeWriter g0(Double x, Double y) {
 		return g0(x, y, null, null);
+	}
+
+	/**
+	 * Rapid Motion
+	 */
+	public GCodeWriter g0(Double x, Double y, Double z) {
+		return g0(x, y, z, null);
 	}
 
 	/**
@@ -77,6 +90,13 @@ public class GCodeWriter {
 	/**
 	 * Coordinated Motion
 	 */
+	public GCodeWriter g1(Double x, Double y, Double z) {
+		return g1(x, y, z, null);
+	}
+
+	/**
+	 * Coordinated Motion
+	 */
 	public GCodeWriter g1(Double x, Double y, Double z, Double f) {
 		String gCode = "G1";
 		if (x != null)
@@ -102,5 +122,17 @@ public class GCodeWriter {
 	public GCodeWriter add(String gCode) {
 		gCodes.add(gCode);
 		return this;
+	}
+
+	public void dumpToDebugFile() {
+		String gCodeString = getGCodes().stream().collect(joining("\n"));
+
+		// save to file for debugging purpose
+		try {
+			Files.writeString(new File("test.nc").toPath(), gCodeString, StandardOpenOption.CREATE,
+					StandardOpenOption.TRUNCATE_EXISTING);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

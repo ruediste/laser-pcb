@@ -1,14 +1,15 @@
+import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 import Select from 'react-dropdown-select';
-import { post, request, baseUrl } from './useData';
 import { toast } from 'react-toastify';
-import WithData from './WithData';
-import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
-import { InputCheck } from './Inputs';
+import CameraView from './CameraView';
+import { Input, InputCheck } from './Inputs';
 import JoggingControls from './JoggingControls';
 import { SendGCode } from './SendGCode';
-import CameraView from './CameraView';
+import { baseUrl, post, request } from './useData';
+import { UseEdit } from './useEdit';
+import WithData from './WithData';
 
 interface UploadingFile {
     name: string;
@@ -173,6 +174,42 @@ function LaserCalibration({ laserCalibration }: { laserCalibration: LaserCalibra
     </div>;
 }
 
+type LaserHeightCalibrationStep = 'PREPARE' | 'EXPOSE_PATTERN' | 'SET_HEIGHT';
+interface LaserHeightCalibrationProcess {
+    currentStep: LaserHeightCalibrationStep
+    startHeight: number
+    endHeight: number
+    count: number
+}
+interface LaserHeightCalibrationProcessPMod {
+    currentStep: LaserHeightCalibrationStep
+    laserHeights: number[]
+}
+function LaserHeightCalibration({ process }: { process: LaserHeightCalibrationProcessPMod }) {
+    const [z, setZ] = useState(0);
+    const heights = process.laserHeights === null ? null : process.laserHeights.map(x => '' + x).join(',');
+    return <div>
+        step: {process.currentStep}<br />
+        {process.currentStep !== 'PREPARE' ? null : <React.Fragment> <UseEdit<LaserHeightCalibrationProcess> url="process/laserHeightCalibration">{([p, edit]) => p === undefined ? null : <React.Fragment>
+            <Input type="number" label="Start Laser Height [mm]" value={'' + p.startHeight} onChange={p => edit.update({ startHeight: parseFloat(p) })} />
+            <Input type="number" label="End Laser Height [mm]" value={'' + p.endHeight} onChange={p => edit.update({ endHeight: parseFloat(p) })} />
+            <Input type="number" label="Number of heights to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
+            <Button onClick={() => edit.save()}>Save</Button>
+        </React.Fragment>}</UseEdit>
+            <JoggingControls />
+            <br /> heights: {heights}<br />
+            <Button onClick={() => post("process/laserHeightCalibration/_exposePattern").send()}>Expose Pattern</Button>
+        </React.Fragment>}
+        {process.currentStep !== 'EXPOSE_PATTERN' ? null : <SendGCode />}
+        {process.currentStep !== 'SET_HEIGHT' ? null : <React.Fragment>
+            <br /> heights: {heights}<br />
+            <Input type="number" label="Start Laser Height [mm]" value={'' + z} onChange={p => setZ(parseFloat(p))} />
+            <Button onClick={() => post("process/laserHeightCalibration/_setHeight").query({ laserHeight: '' + z }).error("Error while setting laser height").success("Laser Height Updated").send()}>Set Height</Button>
+        </React.Fragment>}
+
+    </div>;
+}
+
 
 interface CameraCalibrationProcess {
     currentStep: 'MOVE_TO_ORIGIN' | 'EXPOSE_CROSS' | 'POSITION_CAMERA';
@@ -204,6 +241,7 @@ function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCal
 interface Process {
     printPcb: PrintPcbProcess;
     laserCalibration: LaserCalibrationProcess;
+    laserHeightCalibration: LaserHeightCalibrationProcessPMod;
     cameraCalibration: CameraCalibrationProcess;
 }
 
@@ -215,10 +253,11 @@ export default function ProcessComponent() {
         <WithData<Process> url="process"
             refreshMs={1000}
             render={(process) => {
-                let { printPcb, laserCalibration, cameraCalibration } = process;
+                let { printPcb, laserCalibration, cameraCalibration, laserHeightCalibration } = process;
                 if (printPcb !== null) return <PrintPcb printPcb={printPcb} />;
                 if (laserCalibration !== null) return <LaserCalibration laserCalibration={laserCalibration} />;
                 if (cameraCalibration !== null) return <CameraCalibration cameraCalibration={cameraCalibration} />;
+                if (laserHeightCalibration !== null) return <LaserHeightCalibration process={laserHeightCalibration} />;
 
                 return null;
             }} />

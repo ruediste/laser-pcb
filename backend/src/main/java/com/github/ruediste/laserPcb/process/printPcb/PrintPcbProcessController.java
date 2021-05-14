@@ -1,6 +1,5 @@
 package com.github.ruediste.laserPcb.process.printPcb;
 
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 import java.awt.BasicStroke;
@@ -8,10 +7,7 @@ import java.awt.Color;
 import java.awt.Shape;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Rectangle2D;
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -33,6 +29,8 @@ import org.jfree.svg.PreserveAspectRatio;
 import org.jfree.svg.SVGGraphics2D;
 import org.jfree.svg.ViewBox;
 import org.locationtech.jts.awt.ShapeWriter;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryCollection;
@@ -43,6 +41,7 @@ import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.operation.overlay.OverlayOp;
 import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
+import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +59,7 @@ import com.github.ruediste.laserPcb.cnc.CncConnection.CncState;
 import com.github.ruediste.laserPcb.cnc.CncConnectionAppController;
 import com.github.ruediste.laserPcb.cnc.SendGCodeController;
 import com.github.ruediste.laserPcb.fileUpload.FileUploadService;
+import com.github.ruediste.laserPcb.gCode.GCodeWriter;
 import com.github.ruediste.laserPcb.process.ProcessController;
 import com.github.ruediste.laserPcb.process.ProcessRepository;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
@@ -333,7 +333,7 @@ public class PrintPcbProcessController {
 				// inside
 				Geometry buffer = image.buffer(-toolDiameter / 2);
 				if (!buffer.isEmpty())
-					buffers.add(buffer);
+					buffers.add(simplyfyBuffer(toolDiameter, buffer));
 
 				// remove the area covered by first buffer, to avoid having outermost remaining
 				// areas filled
@@ -350,9 +350,10 @@ public class PrintPcbProcessController {
 				// remaining buffers
 				while (true) {
 					buffer = buffer.buffer(-(toolDiameter * (1 - overlap)));
+
 					if (buffer.isEmpty())
 						break;
-					buffers.add(buffer);
+					buffers.add(simplyfyBuffer(toolDiameter, buffer));
 
 					Geometry areaCoveredByTool = buffer.getBoundary().buffer(1.01 * toolDiameter / 2);
 					try {
@@ -393,13 +394,12 @@ public class PrintPcbProcessController {
 						}
 						if (g instanceof Polygon) {
 							Polygon p = (Polygon) g;
-							buffers.add(p);
+							buffers.add(simplyfyBuffer(toolDiameter, p));
 							newRemaining = dropNon2D(OverlayNGRobust.overlay(newRemaining,
 									p.getBoundary().buffer(toolDiameter / 2), OverlayOp.DIFFERENCE));
 						}
 						nonCovered.add(g);
 					}
-//					remaining = new GeometryCollection(nonCovered.toArray(new Geometry[] {}), image.getFactory());
 					remaining = newRemaining;
 				}
 			}
@@ -427,6 +427,20 @@ public class PrintPcbProcessController {
 						.forEach(point -> svg.fill(new Arc2D.Double(point.getX() - lineWidth / 2,
 								point.getY() - lineWidth / 2, lineWidth, lineWidth, 0, 360, Arc2D.CHORD)));
 
+				// debug output of the endpoints of line segments
+				svg.setColor(Color.BLUE);
+				for (var b : buffers) {
+					b.apply(new CoordinateFilter() {
+
+						@Override
+						public void filter(Coordinate coord) {
+							svg.fill(new Arc2D.Double(coord.x - lineWidth / 4, coord.y - lineWidth / 4, lineWidth / 2,
+									lineWidth / 2, 0, 360, Arc2D.CHORD));
+						}
+
+					});
+				}
+
 				svg.setColor(Color.GREEN);
 				svg.fill(writer.toShape(remaining));
 
@@ -452,6 +466,10 @@ public class PrintPcbProcessController {
 			});
 			throw t;
 		}
+	}
+
+	private Geometry simplyfyBuffer(double toolDiameter, Geometry buffer) {
+		return DouglasPeuckerSimplifier.simplify(buffer, toolDiameter / 5);
 	}
 
 	<T> Function<Object, Stream<T>> ofType(Class<T> cls) {
@@ -517,7 +535,7 @@ public class PrintPcbProcessController {
 	public void addPositionPoint() {
 		CncState state = connCtrl.getConnection().getState();
 		Profile profile = profileRepo.getCurrent();
-		CoordinatePoint point = new CoordinatePoint(state.x + profile.cameraOffsetX, state.y + profile.cameraOffsetY);
+		CoordinatePoint point = new CoordinatePoint(state.x - profile.cameraOffsetX, state.y - profile.cameraOffsetY);
 		Var<Runnable> action = Var.of();
 		update(p -> {
 			if (p.status != PrintPcbStatus.POSITION_TOP && p.status != PrintPcbStatus.POSITION_BOTTOM)
@@ -562,16 +580,9 @@ public class PrintPcbProcessController {
 		log.info("Image Bounds: {}, Transformation: {}", data.imageBounds, transformation);
 
 		// generate and send gcode
-		List<String> gCode = service.generateGCode(data, transformation);
-		String gCodeString = gCode.stream().collect(joining("\n"));
+		GCodeWriter gCode = service.generateGCode(data, transformation);
 
-		// save to file for debugging purpose
-		try {
-			Files.writeString(new File("test.nc").toPath(), gCodeString, StandardOpenOption.CREATE,
-					StandardOpenOption.TRUNCATE_EXISTING);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+		gCode.dumpToDebugFile();
 
 		sendGCodeController.sendGCodes(gCode).thenRun(() -> {
 			update(p -> {

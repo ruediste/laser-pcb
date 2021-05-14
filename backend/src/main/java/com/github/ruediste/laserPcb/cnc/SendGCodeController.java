@@ -46,18 +46,21 @@ public class SendGCodeController {
 					nextIndex++;
 				}
 
+				boolean completed = false;
 				if (cancelled) {
 					log.info("Processing GCodes cancelled");
 					future.cancel(true);
-					conn.gCodeCompleted.remove(gCodeSender);
-
-					sending = false;
-
+					completed = true;
 				} else if (completedIndex >= gCodes.size() - 1) {
 					log.info("Processing GCodes completed");
-					conn.gCodeCompleted.remove(gCodeSender);
 					future.complete(null);
+					completed = true;
+				}
+
+				if (completed) {
+					conn.gCodeCompleted.remove(gCodeSender);
 					sending = false;
+					// connCtrl.setStatusQueryEnabled(true);
 				}
 
 			}
@@ -65,6 +68,7 @@ public class SendGCodeController {
 
 		public void startSending() {
 			sending = true;
+			// connCtrl.setStatusQueryEnabled(false);
 			conn.gCodeCompleted.add(gCodeSender);
 			sendGCode();
 		}

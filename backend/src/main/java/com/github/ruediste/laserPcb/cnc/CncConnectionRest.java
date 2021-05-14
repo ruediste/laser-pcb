@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.github.ruediste.laserPcb.profile.Profile;
 import com.github.ruediste.laserPcb.profile.ProfileRepository;
 
 @RestController
@@ -126,5 +127,14 @@ public class CncConnectionRest {
 	@PostMapping("cncConnection/_autoHome")
 	void autoHome() {
 		connCtrl.getConnection().sendGCode("G28");
+	}
+
+	@PostMapping("cncConnection/_setLaser")
+	void setLaser(@RequestParam boolean laserOn) {
+		Profile profile = profileRepo.getCurrent();
+		if (laserOn)
+			connCtrl.getConnection().sendGCodeForJog(profile.laserOn);
+		else
+			connCtrl.getConnection().sendGCodeForJog(profile.laserOff);
 	}
 }

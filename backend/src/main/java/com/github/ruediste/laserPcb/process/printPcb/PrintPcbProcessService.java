@@ -6,7 +6,6 @@ import java.util.List;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.geom.util.AffineTransformationBuilder;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +55,7 @@ public class PrintPcbProcessService {
 		CoordinatePoint origin = CoordinatePoint.lineIntersection(points.get(0), points.get(1), points.get(2),
 				points.get(3));
 		if (Double.isNaN(origin.x) || Double.isNaN(origin.y)) {
+			log.error("Unable to calculate transformation for points {}", points);
 			return null;
 		}
 		double d0 = origin.vectorTo(points.get(0)).length2();
@@ -87,7 +87,7 @@ public class PrintPcbProcessService {
 		return new Coordinate(origin.x, origin.y);
 	}
 
-	public List<String> generateGCode(InputFileData data, AffineTransformation transformation) {
+	public GCodeWriter generateGCode(InputFileData data, AffineTransformation transformation) {
 		Profile profile = profileRepo.getCurrent();
 		WarningCollector warningCollector = new WarningCollector();
 		var gCodes = new GCodeWriter();
@@ -125,10 +125,9 @@ public class PrintPcbProcessService {
 			}
 		});
 
-		data.buffers.forEach(
-				buffer -> moveGenerator.add(DouglasPeuckerSimplifier.simplify(buffer, profile.exposureWidth / 10)));
+		data.buffers.forEach(moveGenerator::add);
 		moveGenerator.generateMoves(new Coordinate(0, 0));
-		return gCodes.getGCodes();
+		return gCodes;
 	}
 
 }

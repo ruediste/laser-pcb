@@ -66,6 +66,8 @@ export function JoggingControlsNoLoad({ state }: { state: SerialConnections }) {
             </tbody>
         </table>
         <Button onClick={() => post('cncConnection/_autoHome').send()}>Auto Home</Button>
+        <Button onClick={() => post('cncConnection/_setLaser').query({laserOn: 'true'}).send()}>Laser On</Button>
+        <Button onClick={() => post('cncConnection/_setLaser').query({laserOn: 'false'}).send()}>Laser Off</Button>
 
         {state.serialConnected ? <div>X:{'' + state.x} Y:{'' + state.y} Z: {'' + state.z}</div> : null}
     </div> : <div> <Badge variant="warn">Disconnected</Badge> </div>;

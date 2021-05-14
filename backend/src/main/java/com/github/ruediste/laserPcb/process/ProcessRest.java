@@ -12,6 +12,9 @@ import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationP
 import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcess;
 import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcessPMod;
+import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcess;
+import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcessPMod;
+import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationService;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PcbLayer;
@@ -38,6 +41,9 @@ public class ProcessRest {
 	@Autowired
 	PrintPcbProcessController printPcbCtrl;
 
+	@Autowired
+	LaserHeightCalibrationService laserHeightCalibrationService;
+
 	@GetMapping("process")
 	ProcessPMod getProcess() {
 		Process process = repo.get();
@@ -50,6 +56,8 @@ public class ProcessRest {
 			processPMod.laserCalibration = toPMod(process.laserCalibration);
 		if (process.cameraCalibration != null)
 			processPMod.cameraCalibration = toPMod(process.cameraCalibration);
+		if (process.laserHeightCalibration != null)
+			processPMod.laserHeightCalibration = toPMod(process.laserHeightCalibration);
 		return processPMod;
 	}
 
@@ -103,6 +111,13 @@ public class ProcessRest {
 
 		}
 		return filePMod;
+	}
+
+	private LaserHeightCalibrationProcessPMod toPMod(LaserHeightCalibrationProcess laserHeightCalibration) {
+		LaserHeightCalibrationProcessPMod pMod = new LaserHeightCalibrationProcessPMod();
+		pMod.currentStep = laserHeightCalibration.currentStep;
+		pMod.laserHeights = laserHeightCalibrationService.getLaserHeights(laserHeightCalibration);
+		return pMod;
 	}
 
 }

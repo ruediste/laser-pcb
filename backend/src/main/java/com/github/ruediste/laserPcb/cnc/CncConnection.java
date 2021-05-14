@@ -33,6 +33,8 @@ public class CncConnection {
 	volatile private boolean connectionOpened;
 	private CncFirmwareType firmwareType;
 
+	private volatile boolean isJogging;
+
 	public static class InFlightGCode {
 		public byte[] gCodeBytes;
 		public String gCodeString;
@@ -228,8 +230,6 @@ public class CncConnection {
 		con.sendBytes(bb);
 	}
 
-	private boolean isJogging;
-
 	private String removeTrailingNewlines(String s) {
 		while (s.length() > 0 && (s.endsWith("\r") || s.endsWith("\n")))
 			s = s.substring(0, s.length() - 1);
@@ -278,7 +278,6 @@ public class CncConnection {
 
 		try {
 			statusPending.acquire();
-			// after two seconds just ignore the locked semaphore
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
@@ -297,7 +296,7 @@ public class CncConnection {
 		synchronized (lock) {
 			log.info("In flight GCodes: {}", inFlightGCodes.stream().map(x -> x.gCodeString).collect(joining(",")));
 		}
-		sendGCode(gCode, () -> {
+		sendGCodeImpl(gCode, () -> {
 			if (statusPending.availablePermits() == 0)
 				statusPending.release();
 		});

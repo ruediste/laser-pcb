@@ -8,41 +8,9 @@ import { InputCheck, Input } from './Inputs';
 import {
     useHistory
 } from 'react-router-dom';
+import useEdit from './useEdit';
 
-interface EditFunctions<T> {
-    update(value: Partial<T>): void;
-    save(onSuccess?: () => void): void;
-}
-function useEdit<T>(url?: string): [T | undefined, EditFunctions<T>] {
-    const [state, setState] = useState<{ status: 'loading' } | { status: 'error', error: string } | { status: 'loaded', value?: T }>({ status: 'loading' });
-    useEffect(() => {
-        if (url === undefined) {
-            setState({ status: 'loaded' });
-            return;
-        }
-        request(url).method('GET').success(value => setState({ status: 'loaded', value })).error(error => setState({ status: 'error', error })).send();
-    }, [url]);
 
-    return [state.status === 'loaded' ? state.value : undefined, {
-        update: (value) => state.status === 'loaded' ? setState({ status: 'loaded', value: state.value === undefined ? undefined : { ...(state.value), ...value } }) : null,
-        save: (onSuccess?: () => void) => {
-            if (url === undefined) {
-                toast.error('url undefined');
-                return;
-            }
-            if (url === undefined) {
-                toast.error('url undefined');
-                return;
-            }
-            if (state.status === 'loaded' && state.value !== undefined && url !== undefined)
-                post(url).body(state.value).success(() => {
-                    toast.success("Saved");
-                    if (onSuccess !== undefined)
-                        onSuccess();
-                }).error('Error during save').send();
-        }
-    }];
-}
 
 interface Profile {
     id: string;
@@ -140,6 +108,8 @@ export default function ProfileComponent() {
                         <Input type="number" label="Laser Power [m^2/s]" value={'' + profile.laserPower} onChange={p => editProfile.update({ laserPower: parseFloat(p) })} />
                         <Input type="number" label="Laser Dot Size (diameter, [mm])" value={'' + profile.laserDotSize} onChange={p => editProfile.update({ laserDotSize: parseFloat(p) })} />
                         <Input type="number" label="Laser Z [mm]" value={'' + profile.laserZ} onChange={p => editProfile.update({ laserZ: parseFloat(p) })} />
+                        <Button onClick={() => post("process/laserHeightCalibration/_start").error("Error while starting calibration").success(() => history.push("/process")).send()}>Start Calibration</Button>
+
                         <Input type="number" label="Overlap between exposures (fraction of exposure width)" value={'' + profile.exposureOverlap} onChange={p => editProfile.update({ exposureOverlap: parseFloat(p) })} />
 
                         <Input type="number" label="Exposure Width [mm]" comment="temporary exposure setting" value={'' + profile.exposureWidth} onChange={p => editProfile.update({ exposureWidth: parseFloat(p) })} />

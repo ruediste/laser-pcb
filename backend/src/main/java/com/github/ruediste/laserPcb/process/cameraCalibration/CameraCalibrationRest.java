@@ -58,6 +58,8 @@ public class CameraCalibrationRest {
 		CameraCalibrationProcess process = processAppController.get().cameraCalibration;
 		profile.cameraOffsetX = state.x - process.crossX;
 		profile.cameraOffsetY = state.y - process.crossY;
+		log.info("Camera Offset: {}/{} crossExposurePosition: {}/{} cameraPosition: {}/{}", profile.cameraOffsetX,
+				profile.cameraOffsetY, process.crossX, process.crossY, state.x, state.y);
 		profileRepo.save(profile);
 		processAppController.update(p -> p.cameraCalibration = null);
 	}
