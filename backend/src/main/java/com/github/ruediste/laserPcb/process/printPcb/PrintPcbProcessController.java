@@ -53,8 +53,10 @@ import com.github.ruediste.gerberLib.linAlg.CoordinatePoint;
 import com.github.ruediste.gerberLib.parser.GerberParser;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter.Attribute;
+import com.github.ruediste.gerberLib.readGeometricPrimitive.CompoundGerberReadGeometricPrimitiveEventHandler;
 import com.github.ruediste.gerberLib.readGeometricPrimitive.GerberReadGeometricPrimitiveAdapter;
 import com.github.ruediste.laserPcb.Var;
+import com.github.ruediste.laserPcb.cnc.CncConnection;
 import com.github.ruediste.laserPcb.cnc.CncConnection.CncState;
 import com.github.ruediste.laserPcb.cnc.CncConnectionAppController;
 import com.github.ruediste.laserPcb.cnc.SendGCodeController;
@@ -159,6 +161,7 @@ public class PrintPcbProcessController {
 		public String imageSvg;
 		public String imageSvgHash;
 		public String inputSvgHash;
+		public Geometry imageDrill;
 	}
 
 	ConcurrentHashMap<UUID, InputFileData> fileData = new ConcurrentHashMap<>();
@@ -168,8 +171,11 @@ public class PrintPcbProcessController {
 			String input = Files.readString(fileUploadService.getPath(file.id));
 			WarningCollector warningCollector = new WarningCollector();
 			JtsAdapter jtsAdapter = new JtsAdapter();
+			JtsAdapter jtsAdapterDrill = new JtsAdapter();
+			jtsAdapterDrill.arcScale = 0.5;
 			GerberReadGraphicsAdapter readAdapter = new GerberReadGraphicsAdapter(warningCollector,
-					new GerberReadGeometricPrimitiveAdapter(warningCollector, jtsAdapter));
+					new GerberReadGeometricPrimitiveAdapter(warningCollector,
+							new CompoundGerberReadGeometricPrimitiveEventHandler(jtsAdapter, jtsAdapterDrill)));
 			new GerberParser(readAdapter, input).file();
 
 			if (!warningCollector.warnings.isEmpty()) {
@@ -178,6 +184,7 @@ public class PrintPcbProcessController {
 			ShapeWriter writer = new ShapeWriter();
 			InputFileData data = new InputFileData();
 			data.image = jtsAdapter.image();
+			data.imageDrill = jtsAdapterDrill.image();
 			Shape imageShape = writer.toShape(data.image);
 			Rectangle2D bounds = imageShape.getBounds2D();
 			data.imageBounds = bounds;
@@ -209,7 +216,8 @@ public class PrintPcbProcessController {
 							file.layer = PcbLayer.TOP;
 						else if (attr.values.stream().anyMatch(x -> "Bot".equalsIgnoreCase(x)))
 							file.layer = PcbLayer.BOTTOM;
-					}
+					} else if (attr.values.stream().anyMatch(x -> "Drill".equalsIgnoreCase(x)))
+						file.layer = PcbLayer.DRILL;
 				}
 				fileData.put(file.id, data);
 				file.status = InputFileStatus.PARSED;
@@ -243,8 +251,16 @@ public class PrintPcbProcessController {
 				throw new RuntimeException("Files not ready to be processed");
 			process.status = PrintPcbStatus.PROCESSING_FILES;
 			combinedBounds = null;
+			PrintPcbInputFile drillFile = process.fileMap().get(PcbLayer.DRILL);
+			InputFileData drillFileData;
+			if (drillFile != null)
+				drillFileData = fileData.get(drillFile.id);
+			else
+				drillFileData = null;
 			for (var file : process.inputFiles) {
 				if (!file.status.canStartProcessing)
+					continue;
+				if (!file.layer.isCopperLayer)
 					continue;
 				InputFileData data = fileData.get(file.id);
 				if (data == null)
@@ -255,7 +271,7 @@ public class PrintPcbProcessController {
 				data.buffersSvg = null;
 
 				file.status = InputFileStatus.PROCESSING;
-				tasks.add(() -> processFile(file, data, currentProfile));
+				tasks.add(() -> processFile(file, data, currentProfile, drillFileData));
 				if (combinedBounds == null)
 					combinedBounds = data.imageBounds;
 				else
@@ -317,7 +333,8 @@ public class PrintPcbProcessController {
 		return input;
 	}
 
-	private void processFile(PrintPcbInputFile file, InputFileData data, Profile currentProfile) {
+	private void processFile(PrintPcbInputFile file, InputFileData data, Profile currentProfile,
+			InputFileData drillFileData) {
 		try {
 
 			double toolDiameter = currentProfile.exposureWidth;
@@ -326,6 +343,9 @@ public class PrintPcbProcessController {
 			// calculate buffers
 			var buffers = new ArrayList<Geometry>();
 			Geometry image = data.image;
+
+			if (drillFileData != null)
+				image = dropNon2D(OverlayNGRobust.overlay(image, drillFileData.imageDrill, OverlayOp.DIFFERENCE));
 			Geometry remaining;
 			{
 
@@ -514,22 +534,41 @@ public class PrintPcbProcessController {
 	}
 
 	public void startExposing() {
+		Profile profile = profileRepo.getCurrent();
 		update(p -> {
 			if (p.status != PrintPcbStatus.FILES_PROCESSED)
 				throw new RuntimeException("Cannot start exposing in status " + p.status);
+
 			p.status = PrintPcbStatus.POSITION_TOP;
+			if (profile.singleLayerPcb) {
+				if (p.fileMap().containsKey(PcbLayer.BOTTOM))
+					p.status = PrintPcbStatus.POSITION_BOTTOM;
+			}
 			p.positionPoints.clear();
 
 		});
-		// testing only
-		if (false) {
+
+		if (true) {
+			goToCameraHeight();
+		} else {
+			// testing only
 			update(p -> {
-				p.positionPoints.addAll(List.of(CoordinatePoint.of(1, 0), CoordinatePoint.of(2, 0),
+				p.positionPoints.addAll(List.of(CoordinatePoint.of(-1, 0), CoordinatePoint.of(-2, 0),
 						CoordinatePoint.of(0, 1), CoordinatePoint.of(0, 2)));
-				p.status = PrintPcbStatus.EXPOSING_TOP;
+				p.status = PrintPcbStatus.EXPOSING_BOTTOM;
 			});
-			sendExposingCommands(PcbLayer.TOP);
+			sendExposingCommands(PcbLayer.BOTTOM);
 		}
+	}
+
+	private void goToCameraHeight() {
+		Profile profile = profileRepo.getCurrent();
+		CncConnection conn = connCtrl.getConnection();
+		GCodeWriter gCode = new GCodeWriter();
+		gCode.absolutePositioning();
+		gCode.unitsMM();
+		gCode.g0(null, null, profile.cameraZ, profile.fastMovementFeed);
+		conn.sendGCodes(gCode);
 	}
 
 	public void addPositionPoint() {
@@ -583,14 +622,16 @@ public class PrintPcbProcessController {
 		GCodeWriter gCode = service.generateGCode(data, transformation);
 
 		gCode.dumpToDebugFile();
-
+		Var<Runnable> action = Var.of();
 		sendGCodeController.sendGCodes(gCode).thenRun(() -> {
 			update(p -> {
 				p.positionPoints.clear();
 				if (p.status == PrintPcbStatus.EXPOSING_BOTTOM || profileRepo.getCurrent().singleLayerPcb)
 					p.status = PrintPcbStatus.FILES_PROCESSED;
-				else
+				else {
 					p.status = PrintPcbStatus.POSITION_BOTTOM;
+					action.set(this::goToCameraHeight);
+				}
 			});
 		}).exceptionally(t -> {
 			log.error("Error while sending exposing GCode", t);
@@ -600,6 +641,8 @@ public class PrintPcbProcessController {
 			});
 			return null;
 		});
+		if (action.get() != null)
+			action.get().run();
 	}
 
 }

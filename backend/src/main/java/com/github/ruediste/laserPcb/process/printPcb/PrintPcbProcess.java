@@ -12,7 +12,13 @@ import com.github.ruediste.laserPcb.profile.Profile;
 public class PrintPcbProcess {
 
 	public enum PcbLayer {
-		TOP, BOTTOM
+		TOP(true), BOTTOM(true), DRILL(false);
+
+		public final boolean isCopperLayer;
+
+		private PcbLayer(boolean isCopperLayer) {
+			this.isCopperLayer = isCopperLayer;
+		}
 	}
 
 	public enum PrintPcbStatus {
@@ -93,12 +99,12 @@ public class PrintPcbProcess {
 		if (status == PrintPcbStatus.PROCESSING_FILES)
 			return false;
 
-		Map<PcbLayer, PrintPcbInputFile> fileMap = fileMap();
+		long nrOfCopperLayers = fileMap().keySet().stream().filter(x -> x.isCopperLayer).count();
 
 		if (profile.singleLayerPcb)
-			return fileMap.size() == 1;
+			return nrOfCopperLayers == 1;
 		else
-			return fileMap.size() == 2;
+			return nrOfCopperLayers == 2;
 	}
 
 	public Map<PcbLayer, PrintPcbInputFile> fileMap() {
@@ -112,7 +118,7 @@ public class PrintPcbProcess {
 			fileMap.computeIfAbsent(file.layer, x -> new ArrayList<>()).add(file);
 		}
 		if (fileMap.values().stream().anyMatch(x -> x.size() != 1))
-			return null;
+			return Map.of();
 		Map<PcbLayer, PrintPcbInputFile> result = new HashMap<>();
 		fileMap.forEach((k, v) -> result.put(k, v.get(0)));
 		return result;

@@ -29,7 +29,7 @@ public class CncConnectionAppController {
 		stateFuture = executor.scheduleWithFixedDelay(() -> {
 			if (statusQueryEnabled)
 				connection.queryStatus();
-		}, 1000, 2000, TimeUnit.MILLISECONDS);
+		}, 2000, 1000, TimeUnit.MILLISECONDS);
 	}
 
 	public void setStatusQueryEnabled(boolean enabled) {

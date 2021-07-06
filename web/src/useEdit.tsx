@@ -2,6 +2,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { post, request } from './useData';
 
+
 interface EditFunctions<T> {
     update(value: Partial<T>): void;
     save(onSuccess?: () => void): void;

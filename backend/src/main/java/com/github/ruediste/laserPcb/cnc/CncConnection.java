@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
@@ -18,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.github.ruediste.laserPcb.Observable;
+import com.github.ruediste.laserPcb.gCode.GCodeWriter;
 
 public class CncConnection {
 	private final Logger log = LoggerFactory.getLogger(CncConnection.class);
@@ -105,6 +107,17 @@ public class CncConnection {
 								state.x = Double.parseDouble(matcher.group("x"));
 								state.y = Double.parseDouble(matcher.group("y"));
 								state.z = Double.parseDouble(matcher.group("z"));
+
+								if (false && firmwareType == CncFirmwareType.GRBL) {
+									Iterator<InFlightGCode> it = inFlightGCodes.iterator();
+									while (it.hasNext()) {
+										InFlightGCode gCode = it.next();
+										if ("?".equals(gCode.gCodeString)) {
+											it.remove();
+											invokeOnCompleted(gCode);
+										}
+									}
+								}
 							}
 						} else if (line.toLowerCase(Locale.ENGLISH).startsWith("error")
 								|| line.toLowerCase(Locale.ENGLISH).startsWith("ok")) {
@@ -119,12 +132,7 @@ public class CncConnection {
 							log.info("Response for {}: \"{}\" inFlight: {}",
 									removeTrailingNewlines(new String(gCode.gCodeBytes, StandardCharsets.UTF_8)), line,
 									totalInFlightGCodeSize);
-							try {
-								if (gCode.onCompletion != null)
-									gCode.onCompletion.run();
-							} catch (Throwable t) {
-								log.error("Error in callback", t);
-							}
+							invokeOnCompleted(gCode);
 
 							gCodeCompleted.send(null);
 
@@ -145,6 +153,15 @@ public class CncConnection {
 		}
 		closed.countDown();
 		log.info("reading from serial port {} stopped", con.port);
+	}
+
+	private void invokeOnCompleted(InFlightGCode gCode) {
+		try {
+			if (gCode.onCompletion != null)
+				gCode.onCompletion.run();
+		} catch (Throwable t) {
+			log.error("Error in callback", t);
+		}
 	}
 
 	/**
@@ -183,6 +200,10 @@ public class CncConnection {
 	 */
 	public void sendGCode(String gCode) {
 		sendGCode(gCode, null);
+	}
+
+	public void sendGCodes(GCodeWriter gCode) {
+		gCode.getGCodes().forEach(this::sendGCode);
 	}
 
 	public void sendGCode(String gCode, Runnable onCompletion) {

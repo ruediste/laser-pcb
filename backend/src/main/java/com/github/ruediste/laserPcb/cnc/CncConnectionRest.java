@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.github.ruediste.laserPcb.gCode.GCodeWriter;
 import com.github.ruediste.laserPcb.profile.Profile;
 import com.github.ruediste.laserPcb.profile.ProfileRepository;
 
@@ -136,5 +137,26 @@ public class CncConnectionRest {
 			connCtrl.getConnection().sendGCodeForJog(profile.laserOn);
 		else
 			connCtrl.getConnection().sendGCodeForJog(profile.laserOff);
+	}
+
+	@PostMapping("cncConnection/_laserZ")
+	void laserZ() {
+		Profile profile = profileRepo.getCurrent();
+		sendGoToZ(profile.laserZ, profile);
+	}
+
+	private void sendGoToZ(double z, Profile profile) {
+		CncConnection conn = connCtrl.getConnection();
+		GCodeWriter gCode = new GCodeWriter();
+		gCode.absolutePositioning();
+		gCode.unitsMM();
+		gCode.g0(null, null, z, profile.fastMovementFeed);
+		conn.sendGCodes(gCode);
+	}
+
+	@PostMapping("cncConnection/_cameraZ")
+	void cameraZ() {
+		Profile profile = profileRepo.getCurrent();
+		sendGoToZ(profile.cameraZ, profile);
 	}
 }

@@ -28,6 +28,7 @@ interface Profile {
 
     laserOn: string;
     laserOff: string;
+    preExposeGCode: string;
 
     bedSizeX: number;
     bedSizeY: number;
@@ -35,6 +36,7 @@ interface Profile {
     cameraRotation: number;
     cameraOffsetX: number;
     cameraOffsetY: number;
+    cameraZ: number;
 
 
 }
@@ -117,6 +119,7 @@ export default function ProfileComponent() {
 
                         <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn: p })} />
                         <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff: p })} />
+                        <Input type="textarea" label="Pre Expose GCode" value={profile.preExposeGCode} onChange={p => editProfile.update({ preExposeGCode: p })} />
                         <LaserCalibration />
                     </Card.Body>
                 </Card>
@@ -129,6 +132,7 @@ export default function ProfileComponent() {
                         </div>)}
                         <Input type="number" label="CameraOffset X [mm]" value={'' + profile.cameraOffsetX} onChange={p => editProfile.update({ cameraOffsetX: parseFloat(p) })} />
                         <Input type="number" label="CameraOffset Y [mm]" value={'' + profile.cameraOffsetY} onChange={p => editProfile.update({ cameraOffsetY: parseFloat(p) })} />
+                        <Input type="number" label="Camera Z [mm]" value={'' + profile.cameraZ} onChange={p => editProfile.update({ cameraZ: parseFloat(p) })} />
                         <Button onClick={() => post("process/cameraCalibration/start").error("Error while starting calibration").success(() => history.push("/process")).send()}>
                             Start Calibration</Button>
                     </Card.Body>

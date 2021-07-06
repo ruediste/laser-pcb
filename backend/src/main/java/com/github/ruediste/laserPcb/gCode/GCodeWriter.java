@@ -135,4 +135,36 @@ public class GCodeWriter {
 			throw new RuntimeException(e);
 		}
 	}
+
+	public GCodeWriter absolutePositioning() {
+		return add("G90");
+	}
+
+	public GCodeWriter relativePositioning() {
+		return add("G91");
+	}
+
+	public GCodeWriter unitsMM() {
+		return add("G21");
+	}
+
+	public void splitAndAdd(String gCodeSource) {
+		splitGCodeText(gCodeSource).forEach(this::add);
+	}
+
+	List<String> splitGCodeText(String gCodeSource) {
+		List<String> gCodes = new ArrayList<>();
+		for (String code : gCodeSource.split("\n")) {
+			int idx = code.indexOf(';');
+			if (idx >= 0)
+				code = code.substring(0, idx);
+			if (code.endsWith("\r"))
+				code = code.substring(0, code.length() - 1);
+			code = code.trim();
+			if (code.isEmpty())
+				continue;
+			gCodes.add(code);
+		}
+		return gCodes;
+	}
 }

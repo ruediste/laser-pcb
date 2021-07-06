@@ -43,31 +43,52 @@ export function JoggingControlsNoLoad({ state }: { state: SerialConnections }) {
             <tbody>
                 <tr>
                     <td></td>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Y+", distance: ''+res.value }).send()}>Y+</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Y+", distance: '' + res.value }).send()}>Y+</Button></td>
                     <td></td>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Z+", distance: ''+res.value }).send()}>Z+</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Z+", distance: '' + res.value }).send()}>Z+</Button></td>
                     <td rowSpan={3}> {[0.01, 0.1, 1, 10, 100].map((v, idx) => <div key={idx} className="form-check">
                         <input className="form-check-input" type="radio" name="flexRadioDefault" id={"jogValue" + idx} checked={res.value === v} onChange={e => setRes({ value: v })} />
                         <label className="form-check-label" htmlFor={"jogValue" + idx}>{v}</label>
                     </div>)} </td>
                 </tr>
                 <tr>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "X-", distance: ''+res.value }).send()}>X-</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "X-", distance: '' + res.value }).send()}>X-</Button></td>
                     <td></td>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "X+", distance: ''+res.value }).send()}>X+</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "X+", distance: '' + res.value }).send()}>X+</Button></td>
 
                 </tr>
                 <tr>
                     <td></td>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Y-", distance: ''+res.value }).send()}>Y-</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Y-", distance: '' + res.value }).send()}>Y-</Button></td>
                     <td></td>
-                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Z-", distance: ''+res.value }).send()}>Z-</Button></td>
+                    <td> <Button onClick={() => post('cncConnection/_jog').query({ direction: "Z-", distance: '' + res.value }).send()}>Z-</Button></td>
                 </tr>
             </tbody>
         </table>
-        <Button onClick={() => post('cncConnection/_autoHome').send()}>Auto Home</Button>
-        <Button onClick={() => post('cncConnection/_setLaser').query({laserOn: 'true'}).send()}>Laser On</Button>
-        <Button onClick={() => post('cncConnection/_setLaser').query({laserOn: 'false'}).send()}>Laser Off</Button>
+        <table >
+            <tbody>
+                <tr>
+                    <td>
+                        <Button onClick={() => post('cncConnection/_autoHome').send()}>Auto Home</Button>{' '}
+                    </td>
+                    <td>
+                        <Button onClick={() => post('cncConnection/_setLaser').query({ laserOn: 'true' }).send()}>Laser On</Button>
+                    </td>
+                    <td>
+                        <Button onClick={() => post('cncConnection/_laserZ').send()}>Laser Z</Button>
+                    </td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>
+                        <Button onClick={() => post('cncConnection/_setLaser').query({ laserOn: 'false' }).send()}>Laser Off</Button>
+                    </td>
+                    <td>
+                        <Button onClick={() => post('cncConnection/_cameraZ').send()}>Camera Z</Button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
 
         {state.serialConnected ? <div>X:{'' + state.x} Y:{'' + state.y} Z: {'' + state.z}</div> : null}
     </div> : <div> <Badge variant="warn">Disconnected</Badge> </div>;

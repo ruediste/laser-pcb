@@ -51,13 +51,17 @@ public class PrintPcbProcessService {
 
 	public AffineTransformation calculateTransformation(PcbLayer layer, List<CoordinatePoint> points,
 			Rectangle2D imageBounds) {
-		AffineTransformation transformation;
+
+		// get the line intersection
 		CoordinatePoint origin = CoordinatePoint.lineIntersection(points.get(0), points.get(1), points.get(2),
 				points.get(3));
 		if (Double.isNaN(origin.x) || Double.isNaN(origin.y)) {
 			log.error("Unable to calculate transformation for points {}", points);
 			return null;
 		}
+
+		// calculate the base vector based on the point on the base line further away
+		// from the origin
 		double d0 = origin.vectorTo(points.get(0)).length2();
 		double d1 = origin.vectorTo(points.get(1)).length2();
 
@@ -67,20 +71,36 @@ public class PrintPcbProcessService {
 		} else
 			vBase = points.get(1).vectorTo(points.get(0)).normalize();
 
-		if (layer == PcbLayer.TOP)
-			transformation = new AffineTransformationBuilder(
-					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY()),
-					new Coordinate(imageBounds.getMinX() + 1, imageBounds.getMinY()),
-					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY() + 1), toCoordinate(origin),
-					toCoordinate(origin.plus(vBase)), toCoordinate(origin.plus(vBase.normal()))).getTransformation();
-		else
-			transformation = new AffineTransformationBuilder(
-					new Coordinate(imageBounds.getMaxX(), imageBounds.getMaxY()),
-					new Coordinate(imageBounds.getMaxX() - 1, imageBounds.getMaxY()),
-					new Coordinate(imageBounds.getMinX(), imageBounds.getMaxY() - 1), toCoordinate(origin),
-					toCoordinate(origin.plus(vBase)), toCoordinate(origin.plus(vBase.normal().negate())))
-							.getTransformation();
-		return transformation;
+		if (layer == PcbLayer.TOP) {
+
+			// origin is in bottom left corner
+			return new AffineTransformationBuilder(
+
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY()), // origin
+					new Coordinate(imageBounds.getMinX() + 1, imageBounds.getMinY()), // on base
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY() + 1), // on side
+
+					toCoordinate(origin), // origin
+					toCoordinate(origin.plus(vBase)), // on base
+					toCoordinate(origin.plus(vBase.normal())) // on side
+			).getTransformation();
+		} else {
+			// origin is in bottom right corner
+			return new AffineTransformationBuilder(
+
+//					new Coordinate(imageBounds.getMaxX(), imageBounds.getMaxY()), // origin
+//					new Coordinate(imageBounds.getMaxX() - 1, imageBounds.getMaxY()), // on base
+//					new Coordinate(imageBounds.getMinX(), imageBounds.getMaxY() + 1), // on side
+
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY()), // origin
+					new Coordinate(imageBounds.getMinX() + 1, imageBounds.getMinY()), // on base
+					new Coordinate(imageBounds.getMinX(), imageBounds.getMinY() + 1), // on side
+
+					toCoordinate(origin), // origin
+					toCoordinate(origin.plus(vBase)), // on base
+					toCoordinate(origin.plus(vBase.normal().negate())) // on side
+			).getTransformation();
+		}
 	}
 
 	private Coordinate toCoordinate(CoordinatePoint origin) {
@@ -91,6 +111,7 @@ public class PrintPcbProcessService {
 		Profile profile = profileRepo.getCurrent();
 		WarningCollector warningCollector = new WarningCollector();
 		var gCodes = new GCodeWriter();
+		gCodes.splitAndAdd(profile.preExposeGCode);
 		gCodes.add("G90"); // absolute positioning
 		gCodes.add("G21"); // set units to millimeters
 		gCodes.g0(profile.fastMovementFeed);

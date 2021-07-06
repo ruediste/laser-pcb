@@ -32,7 +32,7 @@ function UploadedFile(props: UploadedFileProps) {
             {open ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
             <span className="mr-auto">{file.file.name}</span>
             <span>{file.file.status}</span>
-            <NoClickBubble><Select options={[{ label: 'TOP', value: 'TOP' }, { label: 'BOTTOM', value: "BOTTOM" }]} values={file.file.layer === undefined ? [] : [{ label: file.file.layer, value: file.file.layer }]}
+            <NoClickBubble><Select options={[{ label: 'TOP', value: 'TOP' }, { label: 'BOTTOM', value: "BOTTOM" }, { label: 'DRILL', value: "DRILL" }]} values={file.file.layer === undefined ? [] : [{ label: file.file.layer, value: file.file.layer }]}
                 onChange={(value) => { post('process/printPcb/file/' + file.file.id).body({ layer: value.length === 0 ? null : value[0].value }).success('Layer changed').send() }} /></NoClickBubble>
             <NoClickBubble><Button onClick={(e) => request('process/printPcb/file/' + file.file.id).method('DELETE').success('File ' + file.file.name + " removed").send()}>Remove</Button></NoClickBubble>
         </div>

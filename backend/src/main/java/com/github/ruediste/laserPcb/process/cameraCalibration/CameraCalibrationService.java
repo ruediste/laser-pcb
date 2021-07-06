@@ -17,10 +17,14 @@ public class CameraCalibrationService {
 		Profile profile = profileRepo.getCurrent();
 
 		var gCode = new GCodeWriter();
-		gCode.add("G91"); // relative positioning
-		gCode.add("G21"); // set units to millimeters
+		gCode.splitAndAdd(profile.preExposeGCode);
+
+		gCode.unitsMM().absolutePositioning();
 		gCode.g0(profile.fastMovementFeed);
 		gCode.g1(profile.exposureFeed);
+		gCode.g0(null, null, profile.laserZ);
+
+		gCode.relativePositioning();
 
 		gCode.add(profile.laserOn);
 		gCode.g1(10., null);
@@ -33,6 +37,9 @@ public class CameraCalibrationService {
 		gCode.add("G2 Y10 J5");
 		gCode.add("G2 Y-10 J-5");
 		gCode.add(profile.laserOff);
+
+		gCode.absolutePositioning();
+		gCode.g0(profile.cameraZ);
 		return gCode;
 	}
 }

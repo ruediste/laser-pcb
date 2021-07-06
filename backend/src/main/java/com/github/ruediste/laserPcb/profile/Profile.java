@@ -38,6 +38,9 @@ public class Profile extends EntityBase {
 	public String laserOn;
 	public String laserOff;
 
+	public String preExposeGCode;
+
 	public double cameraOffsetX;
 	public double cameraOffsetY;
+	public double cameraZ;
 }
