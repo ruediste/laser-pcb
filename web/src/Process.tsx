@@ -113,7 +113,7 @@ interface PrintPcbInputFile {
 }
 
 interface PrintPcbProcess {
-    status: 'INITIAL' | 'PROCESSING_FILES' | 'FILES_PROCESSED' | 'POSITION_TOP' | 'EXPOSING_TOP' | 'POSITION_BOTTOM' | 'EXPOSING_BOTTOM';
+    status: 'INITIAL' | 'PROCESSING_FILES' | 'FILES_PROCESSED' | 'POSITION_1' | 'EXPOSING_1' | 'POSITION_2' | 'EXPOSING_2';
     inputFiles: PrintPcbInputFile[];
     processedFiles: PrintPcbInputFile[];
     readyToProcessFiles: boolean;
@@ -136,7 +136,7 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
         }
     }
     return <React.Fragment>
-        {printPcb.status} {printPcb.userMessage}
+        {printPcb.status} 
         <h1> Gerber Files</h1>
         <GerberFiles uploadedFiles={printPcb.inputFiles} />
         <Button disabled={!printPcb.readyToProcessFiles} onClick={() => post("process/printPcb/_processFiles").success('Process Files triggered').send()}>Process Files</Button><br />
@@ -151,12 +151,15 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
             </div>
         </React.Fragment>}
 
-        {printPcb.status !== 'POSITION_TOP' && printPcb.status !== 'POSITION_BOTTOM' ? null : <React.Fragment>
-            <JoggingControls />
-            <CameraView />
+        {printPcb.status !== 'POSITION_1' && printPcb.status !== 'POSITION_2' ? null : <React.Fragment>
+        <p>{printPcb.userMessage}</p>
             <Button onClick={() => post("process/printPcb/_addPositionPoint").send()}>Add Positioning Point</Button>
+            <div className="row">
+                <div className="col-md-6"><JoggingControls /></div>
+                <div className="col-md-6"><CameraView /> </div>
+            </div>
         </React.Fragment>}
-        {printPcb.status !== 'EXPOSING_TOP' && printPcb.status !== 'EXPOSING_BOTTOM' ? null : <React.Fragment>
+        {printPcb.status !== 'EXPOSING_1' && printPcb.status !== 'EXPOSING_2' ? null : <React.Fragment>
             <SendGCode />
         </React.Fragment>}
     </React.Fragment>
@@ -203,7 +206,7 @@ function LaserHeightCalibration({ process }: { process: LaserHeightCalibrationPr
         {process.currentStep !== 'EXPOSE_PATTERN' ? null : <SendGCode />}
         {process.currentStep !== 'SET_HEIGHT' ? null : <React.Fragment>
             <br /> heights: {heights}<br />
-            <Input type="number" label="Start Laser Height [mm]" value={'' + z} onChange={p => setZ(parseFloat(p))} />
+            <Input type="number" label="Set Laser Height [mm]" value={'' + z} onChange={p => setZ(parseFloat(p))} />
             <Button onClick={() => post("process/laserHeightCalibration/_setHeight").query({ laserHeight: '' + z }).error("Error while setting laser height").success("Laser Height Updated").send()}>Set Height</Button>
         </React.Fragment>}
 

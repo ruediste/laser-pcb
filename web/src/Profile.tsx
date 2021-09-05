@@ -10,7 +10,7 @@ import {
 } from 'react-router-dom';
 import useEdit from './useEdit';
 
-
+type Corner='BL'|'BR';
 
 interface Profile {
     id: string;
@@ -37,8 +37,14 @@ interface Profile {
     cameraOffsetX: number;
     cameraOffsetY: number;
     cameraZ: number;
+    preferredAlignmentCorner: Corner;
 
+    minDrillSize: number;
+    maxDrillSize: number;
+    drillOffset: number;
+    drillScale: number;
 
+    boardBorder: number;
 }
 
 interface CollapseCardProps {
@@ -103,7 +109,13 @@ export default function ProfileComponent() {
                 <Input type="number" label="Y Bed Size [mm]" value={'' + profile.bedSizeY} onChange={p => editProfile.update({ bedSizeY: parseFloat(p) })} />
                 <Input type="number" label="Fast Movement Feed [mm/m]" value={'' + profile.fastMovementFeed} onChange={p => editProfile.update({ fastMovementFeed: parseFloat(p) })} />
                 <Input type="number" label="Baud Rate (115200, 250000)" value={'' + profile.baudRate} onChange={p => editProfile.update({ baudRate: parseInt(p) })} />
-
+                <Input type="number" label="Border around the board, from the reference point" value={'' + profile.boardBorder} onChange={p => editProfile.update({ boardBorder: parseInt(p) })} />
+                <label > Preferred Alignment Corner</label>
+                <p>For single layer PCBs only this corner (Bottom Left or Bottom Right) is used. For double layer PCBs the other corner is used for the TOP layer and this corner for the bottom layer</p>
+                <Select<{id: Corner}> options={[{id:'BL'},{id:'BR'}]} values={profile.preferredAlignmentCorner===undefined?[]:[{id:profile.preferredAlignmentCorner}]} onChange={p => {
+                    if (p.length>0)
+                    editProfile.update({ preferredAlignmentCorner:p[0].id });
+                    }}   labelField="id" valueField="id"/>
                 <Card>
                     <Card.Title >Laser</Card.Title>
                     <Card.Body>
@@ -135,6 +147,16 @@ export default function ProfileComponent() {
                         <Input type="number" label="Camera Z [mm]" value={'' + profile.cameraZ} onChange={p => editProfile.update({ cameraZ: parseFloat(p) })} />
                         <Button onClick={() => post("process/cameraCalibration/start").error("Error while starting calibration").success(() => history.push("/process")).send()}>
                             Start Calibration</Button>
+                    </Card.Body>
+                </Card>
+                <Card>
+                    <Card.Title >Drill</Card.Title>
+                    <Card.Body>
+                        The drill hole size is first scaled and then an offset is subtracted. If the resulting size is clamped to the min/max drill size.
+                        <Input type="number" label="Drill Scale [1]" value={'' + profile.drillScale} onChange={p => editProfile.update({ drillScale: parseFloat(p) })} />
+                        <Input type="number" label="Drill Offset [mm]" value={'' + profile.drillOffset} onChange={p => editProfile.update({ drillOffset: parseFloat(p) })} />
+                        <Input type="number" label="Min Drill Size [mm]" value={'' + profile.minDrillSize} onChange={p => editProfile.update({ minDrillSize: parseFloat(p) })} />
+                        <Input type="number" label="Max Drill Size [mm]" value={'' + profile.maxDrillSize} onChange={p => editProfile.update({ maxDrillSize: parseFloat(p) })} />
                     </Card.Body>
                 </Card>
             </React.Fragment>}

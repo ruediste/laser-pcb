@@ -36,25 +36,26 @@ public class PrintPcbProcess {
 		 * The files are processed and ready to be exposed
 		 */
 		FILES_PROCESSED,
-		/**
-		 * Positioning the top layer
-		 */
-		POSITION_TOP,
 
 		/**
-		 * Exposing the top layer
+		 * Positioning the first layer
 		 */
-		EXPOSING_TOP,
+		POSITION_1,
 
 		/**
-		 * Positioning the top layer
+		 * Exposing the first layer
 		 */
-		POSITION_BOTTOM,
+		EXPOSING_1,
 
 		/**
-		 * Exposing the top layer
+		 * Positioning the second layer
 		 */
-		EXPOSING_BOTTOM,;
+		POSITION_2,
+
+		/**
+		 * Exposing the second layer
+		 */
+		EXPOSING_2,;
 
 	}
 
@@ -132,11 +133,11 @@ public class PrintPcbProcess {
 		throw new RuntimeException("No file with id " + id + " found");
 	}
 
-	public String userMessage() {
+	public String userMessage(Profile profile) {
 		switch (status) {
-		case POSITION_TOP:
-		case POSITION_BOTTOM: {
-			String side = status == PrintPcbStatus.POSITION_TOP ? "left" : "right";
+		case POSITION_1:
+		case POSITION_2: {
+			String side = currentPcbAlignmentCorner(profile) == Corner.BL ? "left" : "right";
 			switch (positionPoints.size()) {
 			case 0:
 				return "Move to first point on base line";
@@ -149,8 +150,53 @@ public class PrintPcbProcess {
 			}
 		}
 		default:
-			break;
+			return null;
 		}
-		return null;
 	}
+
+	public PcbLayer currentLayer(Profile profile) {
+		switch (status) {
+		case POSITION_1:
+		case EXPOSING_1:
+			if (profile.singleLayerPcb)
+				if (fileMap().containsKey(PcbLayer.TOP))
+					return PcbLayer.TOP;
+				else
+					return PcbLayer.BOTTOM;
+			else
+				return PcbLayer.TOP;
+
+		case POSITION_2:
+		case EXPOSING_2:
+			if (profile.singleLayerPcb)
+				return null;
+			else
+				return PcbLayer.BOTTOM;
+
+		default:
+			return null;
+		}
+	}
+
+	public Corner currentPcbAlignmentCorner(Profile profile) {
+		switch (status) {
+		case POSITION_1:
+		case EXPOSING_1:
+			if (profile.singleLayerPcb)
+				return profile.preferredAlignmentCorner;
+			else
+				return profile.preferredAlignmentCorner.opposite();
+
+		case POSITION_2:
+		case EXPOSING_2:
+			if (profile.singleLayerPcb)
+				return null;
+			else
+				return profile.preferredAlignmentCorner;
+
+		default:
+			return null;
+		}
+	}
+
 }

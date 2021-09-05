@@ -2,10 +2,8 @@ package com.github.ruediste.laserPcb.process.printPcb;
 
 import static java.util.stream.Collectors.toList;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Shape;
-import java.awt.geom.Arc2D;
 import java.awt.geom.Rectangle2D;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -18,8 +16,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -29,19 +25,8 @@ import org.jfree.svg.PreserveAspectRatio;
 import org.jfree.svg.SVGGraphics2D;
 import org.jfree.svg.ViewBox;
 import org.locationtech.jts.awt.ShapeWriter;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateFilter;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryCollection;
-import org.locationtech.jts.geom.GeometryFilter;
-import org.locationtech.jts.geom.MultiPolygon;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.util.AffineTransformation;
-import org.locationtech.jts.operation.overlay.OverlayOp;
-import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +35,9 @@ import org.springframework.stereotype.Service;
 import com.github.ruediste.gerberLib.WarningCollector;
 import com.github.ruediste.gerberLib.jts.JtsAdapter;
 import com.github.ruediste.gerberLib.linAlg.CoordinatePoint;
+import com.github.ruediste.gerberLib.linAlg.CoordinateTransformation;
 import com.github.ruediste.gerberLib.parser.GerberParser;
+import com.github.ruediste.gerberLib.parser.InputPosition;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter;
 import com.github.ruediste.gerberLib.read.GerberReadGraphicsAdapter.Attribute;
 import com.github.ruediste.gerberLib.readGeometricPrimitive.CompoundGerberReadGeometricPrimitiveEventHandler;
@@ -168,11 +155,31 @@ public class PrintPcbProcessController {
 
 	private void parse(PrintPcbInputFile file) {
 		try {
+			Profile profile = profileRepo.getCurrent();
 			String input = Files.readString(fileUploadService.getPath(file.id));
 			WarningCollector warningCollector = new WarningCollector();
 			JtsAdapter jtsAdapter = new JtsAdapter();
-			JtsAdapter jtsAdapterDrill = new JtsAdapter();
-			jtsAdapterDrill.arcScale = 0.5;
+			JtsAdapter jtsAdapterDrill = new JtsAdapter() {
+
+				private double toDrillSize(double size) {
+					double result = size * profile.drillScale - profile.drillOffset;
+					if (result < profile.minDrillSize)
+						return profile.minDrillSize;
+					if (result > profile.maxDrillSize)
+						return profile.maxDrillSize;
+					return result;
+				}
+
+				@Override
+				public void addArc(InputPosition pos, CoordinateTransformation transformation, CoordinatePoint p,
+						double w, double h, double angSt, double angExt) {
+					CoordinatePoint center = p.plus(w / 2, h / 2);
+					w = toDrillSize(w);
+					h = toDrillSize(h);
+					super.addArc(pos, transformation, center.minus(w / 2, h / 2), w, h, angSt, angExt);
+				}
+			};
+
 			GerberReadGraphicsAdapter readAdapter = new GerberReadGraphicsAdapter(warningCollector,
 					new GerberReadGeometricPrimitiveAdapter(warningCollector,
 							new CompoundGerberReadGeometricPrimitiveEventHandler(jtsAdapter, jtsAdapterDrill)));
@@ -246,17 +253,36 @@ public class PrintPcbProcessController {
 		if (currentProfile == null)
 			throw new RuntimeException("No active profile");
 		List<Runnable> tasks = new ArrayList<>();
+
+		// calculate combined size
+		CombinedImageSize combinedSize = new CombinedImageSize();
+
+		for (var file : get().inputFiles) {
+			InputFileData data = fileData.get(file.id);
+			if (data == null)
+				continue;
+			if (combinedSize.combinedBounds == null)
+				combinedSize.combinedBounds = data.imageBounds;
+			else
+				combinedSize.combinedBounds = combinedSize.combinedBounds.createUnion(data.imageBounds);
+		}
+		combinedSize.combinedSvgTargetWidth = 1000;
+		combinedSize.combinedScale = combinedSize.combinedSvgTargetWidth / combinedSize.combinedBounds.getWidth();
+		combinedSize.combinedSvgTargetHeight = (int) (combinedSize.combinedBounds.getHeight()
+				* combinedSize.combinedScale);
+
+		// create processing tasks
 		update(process -> {
 			if (!process.canStartProcessing(currentProfile))
 				throw new RuntimeException("Files not ready to be processed");
 			process.status = PrintPcbStatus.PROCESSING_FILES;
-			combinedBounds = null;
 			PrintPcbInputFile drillFile = process.fileMap().get(PcbLayer.DRILL);
 			InputFileData drillFileData;
 			if (drillFile != null)
 				drillFileData = fileData.get(drillFile.id);
 			else
 				drillFileData = null;
+
 			for (var file : process.inputFiles) {
 				if (!file.status.canStartProcessing)
 					continue;
@@ -271,18 +297,24 @@ public class PrintPcbProcessController {
 				data.buffersSvg = null;
 
 				file.status = InputFileStatus.PROCESSING;
-				tasks.add(() -> processFile(file, data, currentProfile, drillFileData));
-				if (combinedBounds == null)
-					combinedBounds = data.imageBounds;
-				else
-					combinedBounds = combinedBounds.createUnion(data.imageBounds);
+				tasks.add(() -> {
+					try {
+						service.processFile(file, data, currentProfile, drillFileData, combinedSize);
+						update(p -> file.status = InputFileStatus.PROCESSED);
+					} catch (Throwable t) {
+						log.error("Error wile processing {}", file.name, t);
+						update(p -> {
+							file.status = InputFileStatus.ERROR_PROCESSING;
+							file.errorMessage = t.getMessage();
+						});
+						throw t;
+					}
+				});
+
 			}
 		});
 
-		combinedSvgTargetWidth = 1000;
-		combinedScale = combinedSvgTargetWidth / combinedBounds.getWidth();
-		combinedSvgTargetHeight = (int) (combinedBounds.getHeight() * combinedScale);
-
+		// submit tasks and wait for completion
 		CompletableFuture<Void> allFiles = CompletableFuture
 				.allOf(tasks.stream().map(r -> CompletableFuture.runAsync(r, executor)).collect(toList())
 						.toArray(new CompletableFuture<?>[] {}));
@@ -299,217 +331,6 @@ public class PrintPcbProcessController {
 		}, executor);
 	}
 
-	private Rectangle2D combinedBounds;
-
-	private int combinedSvgTargetWidth;
-
-	private double combinedScale;
-
-	private int combinedSvgTargetHeight;
-
-	private Geometry dropNon2D(Geometry input) {
-		if (input instanceof GeometryCollection) {
-			boolean filter = false;
-			for (int i = 0; i < input.getNumGeometries(); i++) {
-				if (input.getGeometryN(i).getDimension() != 2) {
-					filter = true;
-					break;
-				}
-			}
-			if (filter) {
-				ArrayList<Polygon> geometries = new ArrayList<>();
-				for (int i = 0; i < input.getNumGeometries(); i++) {
-					Geometry geometryN = input.getGeometryN(i);
-					if (geometryN instanceof Polygon) {
-						geometries.add((Polygon) geometryN);
-					}
-				}
-				if (geometries.isEmpty())
-					return new MultiPolygon(null, input.getFactory());
-				else
-					return new MultiPolygon(geometries.toArray(new Polygon[] {}), input.getFactory());
-			}
-		}
-		return input;
-	}
-
-	private void processFile(PrintPcbInputFile file, InputFileData data, Profile currentProfile,
-			InputFileData drillFileData) {
-		try {
-
-			double toolDiameter = currentProfile.exposureWidth;
-			double overlap = currentProfile.exposureOverlap;
-
-			// calculate buffers
-			var buffers = new ArrayList<Geometry>();
-			Geometry image = data.image;
-
-			if (drillFileData != null)
-				image = dropNon2D(OverlayNGRobust.overlay(image, drillFileData.imageDrill, OverlayOp.DIFFERENCE));
-			Geometry remaining;
-			{
-
-				// do first buffer, place the first tool path half the tool diameter to the
-				// inside
-				Geometry buffer = image.buffer(-toolDiameter / 2);
-				if (!buffer.isEmpty())
-					buffers.add(simplyfyBuffer(toolDiameter, buffer));
-
-				// remove the area covered by first buffer, to avoid having outermost remaining
-				// areas filled
-				// remaining = image.buffer(-toolDiameter);
-
-				remaining = image;
-				{
-					Geometry areaCoveredByTool = buffer.getBoundary().buffer(1.01 * toolDiameter / 2); // factor for
-																										// numerical
-																										// stability
-					remaining = dropNon2D(OverlayNGRobust.overlay(remaining, areaCoveredByTool, OverlayOp.DIFFERENCE));
-				}
-
-				// remaining buffers
-				while (true) {
-					buffer = buffer.buffer(-(toolDiameter * (1 - overlap)));
-
-					if (buffer.isEmpty())
-						break;
-					buffers.add(simplyfyBuffer(toolDiameter, buffer));
-
-					Geometry areaCoveredByTool = buffer.getBoundary().buffer(1.01 * toolDiameter / 2);
-					try {
-						remaining = dropNon2D(
-								OverlayNGRobust.overlay(remaining, areaCoveredByTool, OverlayOp.DIFFERENCE));
-					} catch (Exception e) {
-						log.error("Error while updating remaining area", e);
-						remaining.apply(new GeometryFilter() {
-
-							@Override
-							public void filter(Geometry geom) {
-								log.info("Remaining  dim {}: {}", geom.getDimension(), geom);
-							}
-						});
-
-						areaCoveredByTool.apply(new GeometryFilter() {
-
-							@Override
-							public void filter(Geometry geom) {
-								log.info("Area covered by tool dim {}: {}", geom.getDimension(), geom);
-							}
-						});
-					}
-				}
-
-				// fill the remaining areas
-				while (!remaining.isEmpty()) {
-					Geometry newRemaining = remaining;
-					var nonCovered = new ArrayList<Geometry>();
-					for (int n = 0; n < remaining.getNumGeometries(); n++) {
-						Geometry g = remaining.getGeometryN(n);
-						Envelope envelope = g.getEnvelopeInternal();
-						if (envelope.getDiameter() < toolDiameter) {
-							buffers.add(image.getFactory().createPoint(envelope.centre()));
-							newRemaining = dropNon2D(
-									OverlayNGRobust.overlay(newRemaining, g.getEnvelope(), OverlayOp.DIFFERENCE));
-							continue;
-						}
-						if (g instanceof Polygon) {
-							Polygon p = (Polygon) g;
-							buffers.add(simplyfyBuffer(toolDiameter, p));
-							newRemaining = dropNon2D(OverlayNGRobust.overlay(newRemaining,
-									p.getBoundary().buffer(toolDiameter / 2), OverlayOp.DIFFERENCE));
-						}
-						nonCovered.add(g);
-					}
-					remaining = newRemaining;
-				}
-			}
-
-			data.buffers = buffers;
-			ShapeWriter writer = new ShapeWriter();
-
-			// create svg of buffers
-			{
-				float lineWidth = (float) toolDiameter;
-				SVGGraphics2D svg = createEmptyCombinedSvg();
-//				svg.setColor(Color.BLACK);
-//				svg.setStroke(new BasicStroke((float) (Math.abs(bufferDistance) * 2)));
-//				buffers.forEach(b -> svg.draw(writer.toShape(b)));
-
-				svg.setColor(Color.YELLOW);
-				svg.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-				buffers.stream().flatMap(notOfType(Point.class)).forEach(b -> svg.draw(writer.toShape(b)));
-
-				svg.setColor(Color.RED);
-				svg.setStroke(new BasicStroke(lineWidth / 4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-				buffers.stream().flatMap(notOfType(Point.class)).forEach(b -> svg.draw(writer.toShape(b)));
-
-				buffers.stream().flatMap(ofType(Point.class))
-						.forEach(point -> svg.fill(new Arc2D.Double(point.getX() - lineWidth / 2,
-								point.getY() - lineWidth / 2, lineWidth, lineWidth, 0, 360, Arc2D.CHORD)));
-
-				// debug output of the endpoints of line segments
-				svg.setColor(Color.BLUE);
-				for (var b : buffers) {
-					b.apply(new CoordinateFilter() {
-
-						@Override
-						public void filter(Coordinate coord) {
-							svg.fill(new Arc2D.Double(coord.x - lineWidth / 4, coord.y - lineWidth / 4, lineWidth / 2,
-									lineWidth / 2, 0, 360, Arc2D.CHORD));
-						}
-
-					});
-				}
-
-				svg.setColor(Color.GREEN);
-				svg.fill(writer.toShape(remaining));
-
-				data.buffersSvg = toCombinedSvgString(svg);
-				data.buffersSvgHash = sha256(data.buffersSvg);
-			}
-
-			// create svg of layer
-			{
-				SVGGraphics2D svg = createEmptyCombinedSvg();
-				svg.setColor(Color.black);
-				svg.fill(writer.toShape(data.image));
-				data.imageSvg = toCombinedSvgString(svg);
-				data.imageSvgHash = sha256(data.buffersSvg);
-			}
-
-			update(p -> file.status = InputFileStatus.PROCESSED);
-		} catch (Throwable t) {
-			log.error("Error wile processing {}", file.name, t);
-			update(p -> {
-				file.status = InputFileStatus.ERROR_PROCESSING;
-				file.errorMessage = t.getMessage();
-			});
-			throw t;
-		}
-	}
-
-	private Geometry simplyfyBuffer(double toolDiameter, Geometry buffer) {
-		return DouglasPeuckerSimplifier.simplify(buffer, toolDiameter / 5);
-	}
-
-	<T> Function<Object, Stream<T>> ofType(Class<T> cls) {
-		return element -> {
-			if (cls.isInstance(element)) {
-				return Stream.of(cls.cast(element));
-			}
-			return Stream.empty();
-		};
-	}
-
-	<T> Function<T, Stream<T>> notOfType(Class<? extends T> cls) {
-		return element -> {
-			if (!cls.isInstance(element)) {
-				return Stream.of(element);
-			}
-			return Stream.empty();
-		};
-	}
-
 	public static String sha256(String base) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -520,44 +341,35 @@ public class PrintPcbProcessController {
 		}
 	}
 
-	private String toCombinedSvgString(SVGGraphics2D svg) {
-		return svg.getSVGElement(null, false, new ViewBox(0, 0, combinedSvgTargetWidth, combinedSvgTargetHeight),
-				PreserveAspectRatio.XMID_YMID, MeetOrSlice.MEET);
-	}
-
-	private SVGGraphics2D createEmptyCombinedSvg() {
-		SVGGraphics2D svg = new SVGGraphics2D(combinedSvgTargetWidth, combinedSvgTargetHeight);
-		svg.translate(0, combinedSvgTargetHeight);
-		svg.scale(combinedScale, -combinedScale);
-		svg.translate(-combinedBounds.getMinX(), -combinedBounds.getMinY());
-		return svg;
-	}
-
 	public void startExposing() {
 		Profile profile = profileRepo.getCurrent();
 		update(p -> {
 			if (p.status != PrintPcbStatus.FILES_PROCESSED)
 				throw new RuntimeException("Cannot start exposing in status " + p.status);
 
-			p.status = PrintPcbStatus.POSITION_TOP;
-			if (profile.singleLayerPcb) {
-				if (p.fileMap().containsKey(PcbLayer.BOTTOM))
-					p.status = PrintPcbStatus.POSITION_BOTTOM;
-			}
+			p.status = PrintPcbStatus.POSITION_1;
 			p.positionPoints.clear();
 
 		});
 
 		if (true) {
 			goToCameraHeight();
-		} else {
+		} else if (false) {
 			// testing only
 			update(p -> {
 				p.positionPoints.addAll(List.of(CoordinatePoint.of(-1, 0), CoordinatePoint.of(-2, 0),
 						CoordinatePoint.of(0, 1), CoordinatePoint.of(0, 2)));
-				p.status = PrintPcbStatus.EXPOSING_BOTTOM;
+				p.status = PrintPcbStatus.EXPOSING_2;
 			});
-			sendExposingCommands(PcbLayer.BOTTOM);
+			sendExposingCommands();
+		} else {
+			// testing only
+			update(p -> {
+				p.positionPoints.addAll(List.of(CoordinatePoint.of(1, 0), CoordinatePoint.of(2, 0),
+						CoordinatePoint.of(0, 1), CoordinatePoint.of(0, 2)));
+				p.status = PrintPcbStatus.EXPOSING_1;
+			});
+			sendExposingCommands();
 		}
 	}
 
@@ -577,20 +389,20 @@ public class PrintPcbProcessController {
 		CoordinatePoint point = new CoordinatePoint(state.x - profile.cameraOffsetX, state.y - profile.cameraOffsetY);
 		Var<Runnable> action = Var.of();
 		update(p -> {
-			if (p.status != PrintPcbStatus.POSITION_TOP && p.status != PrintPcbStatus.POSITION_BOTTOM)
+			if (p.status != PrintPcbStatus.POSITION_1 && p.status != PrintPcbStatus.POSITION_2)
 				throw new RuntimeException("Cannot add position point in status " + p.status);
 			if (p.positionPoints.size() >= 4)
-				throw new RuntimeException("Cannot more position points");
+				throw new RuntimeException("Cannot add more position points");
 			p.positionPoints.add(point);
 			if (p.positionPoints.size() >= 4) {
 				switch (p.status) {
-				case POSITION_TOP:
-					p.status = PrintPcbStatus.EXPOSING_TOP;
-					action.set(() -> sendExposingCommands(PcbLayer.TOP));
+				case POSITION_1:
+					p.status = PrintPcbStatus.EXPOSING_1;
+					action.set(() -> sendExposingCommands());
 					break;
-				case POSITION_BOTTOM:
-					p.status = PrintPcbStatus.EXPOSING_BOTTOM;
-					action.set(() -> sendExposingCommands(PcbLayer.BOTTOM));
+				case POSITION_2:
+					p.status = PrintPcbStatus.EXPOSING_2;
+					action.set(() -> sendExposingCommands());
 					break;
 				default:
 					throw new UnsupportedOperationException();
@@ -601,14 +413,20 @@ public class PrintPcbProcessController {
 			action.get().run();
 	}
 
-	private void sendExposingCommands(PcbLayer layer) {
+	private void sendExposingCommands() {
 		PrintPcbProcess process = get();
+		Profile profile = profileRepo.getCurrent();
+		Corner pcbCorner = process.currentPcbAlignmentCorner(profile);
+		PcbLayer layer = process.currentLayer(profile);
+
 		PrintPcbInputFile file = process.fileMap().get(layer);
 		InputFileData data = this.fileData.get(file.id);
 
 		// determine coordinate transformation
-		AffineTransformation transformation = service.calculateTransformation(layer, process.positionPoints,
-				data.imageBounds);
+
+		AffineTransformation transformation = service.calculateTransformation(pcbCorner,
+				layer == PcbLayer.TOP ? pcbCorner : pcbCorner.opposite(), process.positionPoints, data.imageBounds,
+				profile.boardBorder);
 		if (transformation == null) {
 			update(p -> {
 				p.status = PrintPcbStatus.FILES_PROCESSED;
@@ -626,10 +444,10 @@ public class PrintPcbProcessController {
 		sendGCodeController.sendGCodes(gCode).thenRun(() -> {
 			update(p -> {
 				p.positionPoints.clear();
-				if (p.status == PrintPcbStatus.EXPOSING_BOTTOM || profileRepo.getCurrent().singleLayerPcb)
+				if (p.status == PrintPcbStatus.EXPOSING_2 || profileRepo.getCurrent().singleLayerPcb)
 					p.status = PrintPcbStatus.FILES_PROCESSED;
 				else {
-					p.status = PrintPcbStatus.POSITION_BOTTOM;
+					p.status = PrintPcbStatus.POSITION_2;
 					action.set(this::goToCameraHeight);
 				}
 			});

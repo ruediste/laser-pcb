@@ -21,6 +21,6 @@ public class DataDirService {
 	}
 
 	public Path getDataDir() {
-		return Paths.get("data");
+		return Paths.get("/home/ruedi/Dropbox/laserPcb/");
 	}
 }

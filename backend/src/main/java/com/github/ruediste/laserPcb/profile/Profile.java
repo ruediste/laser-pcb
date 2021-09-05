@@ -1,11 +1,13 @@
 package com.github.ruediste.laserPcb.profile;
 
 import com.github.ruediste.laserPcb.EntityBase;
+import com.github.ruediste.laserPcb.process.printPcb.Corner;
 
 public class Profile extends EntityBase {
 
 	public String name;
 	public boolean singleLayerPcb;
+	public Corner preferredAlignmentCorner = Corner.BL;
 
 	public double laserPower;
 	public double laserDotSize;
@@ -43,4 +45,11 @@ public class Profile extends EntityBase {
 	public double cameraOffsetX;
 	public double cameraOffsetY;
 	public double cameraZ;
+
+	public double minDrillSize;
+	public double maxDrillSize;
+	public double drillOffset;
+	public double drillScale = 1;
+
+	public double boardBorder;
 }

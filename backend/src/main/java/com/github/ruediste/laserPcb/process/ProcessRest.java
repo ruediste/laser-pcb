@@ -80,7 +80,7 @@ public class ProcessRest {
 			printPcbPMod.readyToProcessFiles = printPcb.canStartProcessing(profile);
 		}
 
-		printPcbPMod.userMessage = printPcb.userMessage();
+		printPcbPMod.userMessage = printPcb.userMessage(profile);
 		return printPcbPMod;
 	}
 
