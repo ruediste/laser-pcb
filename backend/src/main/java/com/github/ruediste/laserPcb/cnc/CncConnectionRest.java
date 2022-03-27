@@ -108,7 +108,6 @@ public class CncConnectionRest {
 
 	@PostMapping("cncConnection/_jog")
 	void jog(@RequestParam String direction, @RequestParam double distance) {
-		System.out.println(distance);
 		if ("X-".equals(direction))
 			connCtrl.getConnection().sendGCodeForJog(String.format("G0 X%.2f", -distance));
 		if ("X+".equals(direction))

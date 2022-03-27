@@ -1,7 +1,5 @@
 package com.github.ruediste.laserPcb.cnc;
 
-import static java.util.stream.Collectors.joining;
-
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -76,7 +74,7 @@ public class CncConnection {
 				if (ch == '\n') {
 					String line = sb.toString();
 					sb.setLength(0);
-					log.info("Received {}", line);
+					// log.info("Received {}", line);
 
 					if (!connectionOpened) {
 						if (line.startsWith("Grbl")) {
@@ -102,7 +100,7 @@ public class CncConnection {
 							throw new UnsupportedOperationException();
 						}
 						if (matcher.matches()) {
-							log.info("Status received: {}", line);
+							// log.info("Status received: {}", line);
 							synchronized (state) {
 								state.x = Double.parseDouble(matcher.group("x"));
 								state.y = Double.parseDouble(matcher.group("y"));
@@ -129,9 +127,9 @@ public class CncConnection {
 								totalInFlightGCodeSize = totalInFlightGCodeSize();
 								lock.notifyAll();
 							}
-							log.info("Response for {}: \"{}\" inFlight: {}",
-									removeTrailingNewlines(new String(gCode.gCodeBytes, StandardCharsets.UTF_8)), line,
-									totalInFlightGCodeSize);
+//							log.info("Response for {}: \"{}\" inFlight: {}",
+//									removeTrailingNewlines(new String(gCode.gCodeBytes, StandardCharsets.UTF_8)), line,
+//									totalInFlightGCodeSize);
 							invokeOnCompleted(gCode);
 
 							gCodeCompleted.send(null);
@@ -170,6 +168,7 @@ public class CncConnection {
 	 * @return
 	 */
 	public boolean sendGCodeNonBlocking(String gCode, Runnable onCompletion) {
+		isJogging = false;
 		gCode = removeTrailingNewlines(gCode);
 		if (gCode.trim().isEmpty()) {
 			if (onCompletion != null)
@@ -208,16 +207,20 @@ public class CncConnection {
 
 	public void sendGCode(String gCode, Runnable onCompletion) {
 		isJogging = false;
+		log.info("Sending GCode: {}", gCode);
 		sendGCodeImpl(gCode, onCompletion);
 	}
 
 	public void sendGCodeForJog(String gCode) {
 		if (!isJogging) {
 			isJogging = true;
+			log.info("Switching to Jog Mode");
 			sendGCodeImpl("G91", null); // relative positioning
 			sendGCodeImpl("G21", null); // set units to millimeters
 			sendGCodeImpl("G0 F10000", null); // set feed
+			sendGCodeImpl("M201 X100 Y100 Z100", null); // set acceleration
 		}
+		log.info("Sending jog GCode: {}", gCode);
 		sendGCodeImpl(gCode, null);
 	}
 
@@ -229,7 +232,7 @@ public class CncConnection {
 			return;
 		}
 
-		log.info("Sending {}", gCode);
+		// log.info("Sending {}", gCode);
 		byte[] bb = (gCode + "\n").getBytes(StandardCharsets.UTF_8);
 
 		synchronized (lock) {
@@ -314,9 +317,9 @@ public class CncConnection {
 		default:
 			throw new UnsupportedOperationException();
 		}
-		synchronized (lock) {
-			log.info("In flight GCodes: {}", inFlightGCodes.stream().map(x -> x.gCodeString).collect(joining(",")));
-		}
+//		synchronized (lock) {
+//			log.info("In flight GCodes: {}", inFlightGCodes.stream().map(x -> x.gCodeString).collect(joining(",")));
+//		}
 		sendGCodeImpl(gCode, () -> {
 			if (statusPending.availablePermits() == 0)
 				statusPending.release();
