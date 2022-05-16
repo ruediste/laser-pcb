@@ -1,8 +1,7 @@
-import React from "react";
-import { Badge, Button } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import Select from "react-dropdown-select";
 import CameraView from "./CameraView";
-import {JoggingControlsNoLoad, SerialConnections } from "./JoggingControls";
+import { JoggingControlsNoLoad, SerialConnections } from "./JoggingControls";
 import { post } from "./useData";
 import WithData from "./WithData";
 
@@ -18,8 +17,8 @@ export default function ControlComponent() {
                     onChange={(value) => { post('cncConnection/_setSerialConnection').query({ dev: value[0].value }).success('Serial Connection Changed').send() }} />
                 <Button onClick={() => post('cncConnection/_connect').success("Connection initiated").send()}>Connect</Button>
                 <Button onClick={() => post('cncConnection/_disconnect').success("Disconnected").send()}>Disconnect</Button>
-               
-               <JoggingControlsNoLoad state={state}/>
+
+                <JoggingControlsNoLoad state={state} />
 
                 Video Connection
                 <Select options={state.availableVideoConnections.map((x) => ({ label: x, value: x }))} values={state.selectedVideoConnection === undefined || state.selectedVideoConnection === null ? [] : [{ label: state.selectedVideoConnection, value: state.selectedVideoConnection }]}

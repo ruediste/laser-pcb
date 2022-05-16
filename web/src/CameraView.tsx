@@ -6,7 +6,7 @@ export default function CameraView() {
     return <div className="d-flex justify-content-center" style={{}}>
         <div style={{ display: 'inline-block', maxWidth: '100%', position: 'relative' }}>
             <img style={{ width: '100%' }}
-                src={baseUrl + 'cncConnection/frame.jpg?c=' + frameCount} onLoad={() => setFrameCount(c => c + 1)} />
+                src={baseUrl + 'cncConnection/frame.jpg?c=' + frameCount} onLoad={() => setFrameCount(c => c + 1)} alt="" />
 
             <div className="d-flex justify-content-center" style={{ position: 'absolute', left: 0, width: '100%', top: 0, height: '100%' }} >
                 <svg viewBox="0 0 176.13 178.91" width="100%">
