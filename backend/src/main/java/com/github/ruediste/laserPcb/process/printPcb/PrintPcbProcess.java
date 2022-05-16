@@ -80,6 +80,7 @@ public class PrintPcbProcess {
 	}
 
 	public List<PrintPcbInputFile> inputFiles = new ArrayList<>();
+	public Rectangle combinedBounds;
 
 	public static class PositionPoint {
 		public PositionPoint() {

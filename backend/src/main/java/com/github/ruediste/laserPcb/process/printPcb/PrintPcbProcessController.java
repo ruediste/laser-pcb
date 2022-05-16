@@ -276,6 +276,8 @@ public class PrintPcbProcessController {
 			if (!process.canStartProcessing(currentProfile))
 				throw new RuntimeException("Files not ready to be processed");
 			process.status = PrintPcbStatus.PROCESSING_FILES;
+			process.combinedBounds = new Rectangle(combinedSize.combinedBounds);
+
 			PrintPcbInputFile drillFile = process.fileMap().get(PcbLayer.DRILL);
 			InputFileData drillFileData;
 			if (drillFile != null)
@@ -425,8 +427,8 @@ public class PrintPcbProcessController {
 		// determine coordinate transformation
 
 		AffineTransformation transformation = service.calculateTransformation(pcbCorner,
-				layer == PcbLayer.TOP ? pcbCorner : pcbCorner.opposite(), process.positionPoints, data.imageBounds,
-				profile.boardBorder);
+				layer == PcbLayer.TOP ? pcbCorner : pcbCorner.opposite(), process.positionPoints,
+				process.combinedBounds.toRectangle2d(), profile.boardBorder);
 		if (transformation == null) {
 			update(p -> {
 				p.status = PrintPcbStatus.FILES_PROCESSED;
@@ -434,7 +436,8 @@ public class PrintPcbProcessController {
 			});
 			throw new RuntimeException("Error while calculating transformation");
 		}
-		log.info("Image Bounds: {}, Transformation: {}", data.imageBounds, transformation);
+		log.info("Image Bounds: {}, CombinedBounds: {}, PositionPoints: {}, Transformation: {}", data.imageBounds,
+				process.combinedBounds.toRectangle2d(), process.positionPoints, transformation);
 
 		// generate and send gcode
 		GCodeWriter gCode = service.generateGCode(data, transformation);
