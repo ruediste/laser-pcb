@@ -19,10 +19,15 @@ import org.slf4j.LoggerFactory;
 import com.github.ruediste.laserPcb.Observable;
 import com.github.ruediste.laserPcb.gCode.GCodeWriter;
 
+/**
+ * Manages a {@link ISerialConnection}, managing the {@link CncState} of the
+ * connection (position of the machine), throttling of gcode sending to avoid
+ * buffer overflows, etc
+ */
 public class CncConnection {
 	private final Logger log = LoggerFactory.getLogger(CncConnection.class);
 
-	public SerialConnection con;
+	public ISerialConnection con;
 	private CncState state = new CncState();
 	private volatile boolean closing;
 	private CountDownLatch closed = new CountDownLatch(1);
@@ -51,9 +56,9 @@ public class CncConnection {
 	private Deque<InFlightGCode> inFlightGCodes = new ArrayDeque<>();
 	int controllerReceiveBufferSize = 96;
 
-	public CncConnection(SerialConnection con) {
+	public CncConnection(ISerialConnection con) {
 		this.con = con;
-		new Thread(this::readLoop, "serialReader " + con.port).start();
+		new Thread(this::readLoop, "serialReader " + con.getPort()).start();
 	}
 
 	static Pattern statusLinePatternGrbl = Pattern.compile(
@@ -62,12 +67,12 @@ public class CncConnection {
 			.compile("X:(?<x>-?\\d+\\.\\d+) Y:(?<y>-?\\d+\\.\\d+) Z:(?<z>-?\\d+\\.\\d+).*");
 
 	private void readLoop() {
-		log.info("Starting to read from serial port {}", con.port);
+		log.info("Starting to read from serial port {}", con.getPort());
 		try {
 
 			StringBuilder sb = new StringBuilder();
 			while (!closing) {
-				int ch = con.in.read();
+				int ch = con.getIn().read();
 				if (ch == -1)
 					break;
 
@@ -106,7 +111,7 @@ public class CncConnection {
 								state.y = Double.parseDouble(matcher.group("y"));
 								state.z = Double.parseDouble(matcher.group("z"));
 
-								if (false && firmwareType == CncFirmwareType.GRBL) {
+								if (firmwareType == CncFirmwareType.GRBL) {
 									Iterator<InFlightGCode> it = inFlightGCodes.iterator();
 									while (it.hasNext()) {
 										InFlightGCode gCode = it.next();
@@ -137,7 +142,7 @@ public class CncConnection {
 						} else if (removeTrailingNewlines(line).isEmpty()) {
 							// swallow
 						} else {
-							log.info("received line {}", line);
+							log.info("received unhandled line {}", line);
 						}
 					}
 
@@ -147,10 +152,10 @@ public class CncConnection {
 					sb.append((char) ch);
 			}
 		} catch (Throwable t) {
-			log.error("Error in read loop of port " + con.port, t);
+			log.error("Error in read loop of port " + con.getPort(), t);
 		}
 		closed.countDown();
-		log.info("reading from serial port {} stopped", con.port);
+		log.info("reading from serial port {} stopped", con.getPort());
 	}
 
 	private void invokeOnCompleted(InFlightGCode gCode) {

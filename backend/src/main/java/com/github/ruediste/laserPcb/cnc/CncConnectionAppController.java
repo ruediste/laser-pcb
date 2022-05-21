@@ -25,7 +25,10 @@ public class CncConnectionAppController {
 
 	public synchronized void connect(Path serialDev, int baudRate) {
 		disconnect();
-		connection = new CncConnection(new SerialConnection(serialDev.toAbsolutePath().toString(), baudRate));
+		if (serialDev.equals(Path.of("simulator")))
+			connection = new CncConnection(new SimulatorSerialConnection());
+		else
+			connection = new CncConnection(new RealSerialConnection(serialDev.toAbsolutePath().toString(), baudRate));
 		stateFuture = executor.scheduleWithFixedDelay(() -> {
 			if (statusQueryEnabled)
 				connection.queryStatus();
@@ -38,7 +41,7 @@ public class CncConnectionAppController {
 
 	public synchronized void disconnect() {
 		if (connection != null) {
-			log.info("Disconnecting from {}", connection.con.port);
+			log.info("Disconnecting from {}", connection.con.getPort());
 			stateFuture.cancel(true);
 			connection.close();
 			connection = null;

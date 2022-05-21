@@ -114,6 +114,7 @@ public class AvailableDevicesAppController {
 		log.info("Device scan of {} starting ...", directory.toAbsolutePath());
 		currentSerialConnections.clear();
 		currentVideoConnections.clear();
+		currentSerialConnections.add(Path.of("simulator"));
 		try {
 			Files.list(directory).forEach(file -> {
 				if (isSerialConnection(file)) {

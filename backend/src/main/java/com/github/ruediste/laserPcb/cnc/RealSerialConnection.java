@@ -10,20 +10,20 @@ import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
 
-public class SerialConnection {
+public class RealSerialConnection implements ISerialConnection {
 
-	private final Logger log = LoggerFactory.getLogger(SerialConnection.class);
+	private final Logger log = LoggerFactory.getLogger(RealSerialConnection.class);
 
 	private volatile boolean closing;
 	private CountDownLatch closed = new CountDownLatch(1);
 
 	private PipedOutputStream out;
 
-	public PipedInputStream in;
+	private final PipedInputStream in;
 
-	public final String port;
+	private final String port;
 
-	public SerialConnection(String port, int baudRate) {
+	public RealSerialConnection(String port, int baudRate) {
 		this.port = port;
 		log.info("Opening {}", port);
 		commPort = SerialPort.getCommPort(port);
@@ -51,7 +51,7 @@ public class SerialConnection {
 	}
 
 	private void readLoop() {
-		log.info("Starting to read from serial port {}", port);
+		log.info("Starting to read from serial port {}", getPort());
 		try {
 			byte buffer[] = new byte[1024];
 			while (true) {
@@ -68,10 +68,10 @@ public class SerialConnection {
 				}
 			}
 		} catch (Throwable t) {
-			log.error("Error in read loop of port " + port, t);
+			log.error("Error in read loop of port " + getPort(), t);
 		}
 		closed.countDown();
-		log.info("reading from serial port {} stopped", port);
+		log.info("reading from serial port {} stopped", getPort());
 	}
 
 	private static String hexChars = "0123456789ABCDEF";
@@ -93,14 +93,15 @@ public class SerialConnection {
 		return sbHex.toString() + "   " + sbAscii.toString();
 	}
 
+	@Override
 	public void close() {
 		closing = true;
 		try {
 
 			if (!commPort.closePort())
-				throw new RuntimeException("Error while closing port " + port);
+				throw new RuntimeException("Error while closing port " + getPort());
 
-			in.close();
+			getIn().close();
 			out.close();
 			closed.await();
 		} catch (InterruptedException e) {
@@ -111,6 +112,7 @@ public class SerialConnection {
 		}
 	}
 
+	@Override
 	public synchronized void sendBytes(byte[] tx) {
 		int l = 0;
 		while (true) {
@@ -124,6 +126,16 @@ public class SerialConnection {
 				break;
 		}
 		log.debug("Sending {} complete", hexDump(tx, 0, tx.length));
+	}
+
+	@Override
+	public String getPort() {
+		return port;
+	}
+
+	@Override
+	public PipedInputStream getIn() {
+		return in;
 	}
 
 }
