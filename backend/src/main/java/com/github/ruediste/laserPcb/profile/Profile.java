@@ -9,8 +9,6 @@ public class Profile extends EntityBase {
 	public boolean singleLayerPcb;
 	public Corner preferredAlignmentCorner = Corner.BL;
 
-	public double laserPower;
-	public double laserDotSize;
 	public double laserZ;
 
 	public int cameraRotation;
@@ -23,12 +21,12 @@ public class Profile extends EntityBase {
 	public double exposureOverlap;
 
 	/**
-	 * Temporary setting manually configure exposure
+	 * With of a line drawn by the laser
 	 */
 	public double exposureWidth;
 
 	/**
-	 * Temporary setting manually configure exposure
+	 * Feed to use during exposure
 	 */
 	public double exposureFeed;
 

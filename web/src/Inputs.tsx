@@ -35,9 +35,8 @@ export function Input(props: InputProps) {
     if (props.type === 'textarea')
         return <div className="form-group">
             <label htmlFor={id}>{props.label}</label>
-            <textarea className="form-control" id={id} onChange={e => props.onChange(e.target.value)} >
-                {props.value}
-                </textarea>
+            <textarea className="form-control" id={id} onChange={e => props.onChange(e.target.value)} value={props.value}>
+            </textarea>
             {props.comment === undefined ? null :
                 <small className="form-text text-muted">{props.comment}</small>
             }

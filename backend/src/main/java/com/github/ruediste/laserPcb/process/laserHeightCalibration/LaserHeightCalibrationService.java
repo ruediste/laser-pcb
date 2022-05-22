@@ -35,13 +35,16 @@ public class LaserHeightCalibrationService {
 		gCode.g0(profile.fastMovementFeed);
 		gCode.g1(profile.exposureFeed);
 
+		gCode.relativePositioning();
+		gCode.g0(profile.cameraOffsetX, profile.cameraOffsetY); // move by the current camera offset
+
 		boolean first = true;
 		List<Double> laserHeights = getLaserHeights(process);
 		for (double z : laserHeights) {
-			gCode.add("G90"); // absolute positioning
+			gCode.absolutePositioning();
 			gCode.g0(null, null, z); // go to laser height
 
-			gCode.add("G91"); // relative positioning
+			gCode.relativePositioning();
 			if (!first)
 				gCode.g0(null, profile.exposureWidth * 5); // leave a gap between exposure pairs
 			first = false;

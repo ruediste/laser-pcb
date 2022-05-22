@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge, Button } from "react-bootstrap";
-import { useHistory, useLocation } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { post } from "./useData";
 import WithData from "./WithData";
 import queryString from "query-string";
@@ -20,7 +20,7 @@ export interface SerialConnections {
 }
 
 function useQueryArgs<T>(name: string, def: T): [T, (value: T) => void] {
-    const hist = useHistory();
+    const navigate = useNavigate();
     const location = useLocation();
     const parsedQuery = queryString.parse(location.search);
     const valueStr = parsedQuery[name];
@@ -30,14 +30,14 @@ function useQueryArgs<T>(name: string, def: T): [T, (value: T) => void] {
     else
         value = JSON.parse(valueStr as string) as T;
     return [value, v => {
-        hist.replace({ search: queryString.stringify({ [name]: JSON.stringify(v) }) });
+        navigate({ search: queryString.stringify({ [name]: JSON.stringify(v) }) }, { replace: true });
     }];
 }
 
 export function JoggingControlsNoLoad({ state }: { state: SerialConnections }) {
     const [res, setRes] = useQueryArgs('jog', { value: 1 });
     return state.serialConnected ? <div>
-        <Badge variant="success">Connected</Badge>
+        <Badge bg="success">Connected</Badge>
 
         <table>
             <tbody>
@@ -91,7 +91,7 @@ export function JoggingControlsNoLoad({ state }: { state: SerialConnections }) {
         </table>
 
         {state.serialConnected ? <div>X:{'' + state.x} Y:{'' + state.y} Z: {'' + state.z}</div> : null}
-    </div> : <div> <Badge variant="warn">Disconnected</Badge> </div>;
+    </div> : <div> <Badge bg="warn">Disconnected</Badge> </div>;
 }
 
 export default function JoggingControls() {

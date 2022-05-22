@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationProcess;
 import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationProcessPMod;
-import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcess;
-import com.github.ruediste.laserPcb.process.laserCalibration.LaserCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcess;
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationService;
@@ -52,8 +50,6 @@ public class ProcessRest {
 		PrintPcbProcess printPcb = process.printPcb;
 		if (printPcb != null)
 			processPMod.printPcb = toPMod(printPcb, profile);
-		if (process.laserCalibration != null)
-			processPMod.laserCalibration = toPMod(process.laserCalibration);
 		if (process.cameraCalibration != null)
 			processPMod.cameraCalibration = toPMod(process.cameraCalibration);
 		if (process.laserHeightCalibration != null)
@@ -82,13 +78,6 @@ public class ProcessRest {
 
 		printPcbPMod.userMessage = printPcb.userMessage(profile);
 		return printPcbPMod;
-	}
-
-	private LaserCalibrationProcessPMod toPMod(LaserCalibrationProcess process) {
-		LaserCalibrationProcessPMod pMod = new LaserCalibrationProcessPMod();
-		pMod.v1 = process.v1;
-		pMod.v2 = process.v2;
-		return pMod;
 	}
 
 	private CameraCalibrationProcessPMod toPMod(CameraCalibrationProcess process) {

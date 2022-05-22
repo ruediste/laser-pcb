@@ -1,6 +1,6 @@
 import useData, { UseDataArgs } from "./useData";
 
-export default function WithData<T>(props: UseDataArgs & { render: (value: T, trigger: () => void) => JSX.Element|null }) {
+export default function WithData<T>(props: UseDataArgs & { render: (value: T, trigger: () => void) => JSX.Element | null }) {
     const { render, ...otherProps } = props;
     const data = useData<T>(otherProps);
 
@@ -11,7 +11,7 @@ export default function WithData<T>(props: UseDataArgs & { render: (value: T, tr
     }
     if (data.state === 'loading') {
         return <div className="spinner-border" role="status">
-            <span className="sr-only">Loading...</span>
+            <span className="visually-hidden">Loading...</span>
         </div>
     }
     if (data.state === 'success') {

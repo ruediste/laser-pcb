@@ -2,7 +2,7 @@ import React from 'react';
 import { Nav, Navbar } from 'react-bootstrap';
 import {
   BrowserRouter as Router,
-  Link, Route, Switch,
+  Link, Route, Routes,
   useLocation
 } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -42,15 +42,9 @@ function App() {
   return (
     <Router>
       <Navigation />
-      <Switch>
-        {navEntries.map((e, idx) =>
-          <Route key={idx} path={e.path}>
-            <div className="container-fluid">
-              <e.component />
-            </div>
-          </Route>
-        )}
-      </Switch>
+      <Routes>
+        {navEntries.map((e, idx) => <Route key={idx} path={e.path} element={<e.component />} />)}
+      </Routes>
       <ToastContainer hideProgressBar={true} />
     </Router>
   );

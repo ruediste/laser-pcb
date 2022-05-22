@@ -1,6 +1,6 @@
 import { ChevronDownIcon, ChevronRightIcon } from '@primer/octicons-react';
 import React, { useState } from 'react';
-import { Button, Form } from 'react-bootstrap';
+import { Button, Col, Container, Form, Row } from 'react-bootstrap';
 import Select from 'react-dropdown-select';
 import { toast } from 'react-toastify';
 import CameraView from './CameraView';
@@ -8,7 +8,7 @@ import { Input, InputCheck } from './Inputs';
 import JoggingControls from './JoggingControls';
 import { SendGCode } from './SendGCode';
 import { baseUrl, post, request } from './useData';
-import { UseEdit } from './useEdit';
+import { EditData } from './useEdit';
 import WithData from './WithData';
 
 interface UploadingFile {
@@ -52,8 +52,9 @@ function GerberFiles(props: GerberFilesProps) {
     const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
 
     return <Form>
-        <div className="custom-file">
-            <input type="file" className="custom-file-input" multiple onChange={e => {
+        <div className="mb-3">
+            <label className="form-label">Choose file</label>
+            <input type="file" className="form-control" multiple onChange={e => {
                 const files = e.target.files;
                 if (files == null)
                     return;
@@ -80,8 +81,8 @@ function GerberFiles(props: GerberFilesProps) {
                 // clear the selected files
                 e.target.value = '';
             }} />
-            <label className="custom-file-label">Choose file</label>
         </div>
+
         {uploadingFiles.map((file, idx) =>
             <div key={idx} className="d-flex align-items-center">
                 <span>{file.name}</span>
@@ -136,7 +137,7 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
         }
     }
     return <React.Fragment>
-        {printPcb.status} 
+        {printPcb.status}
         <h1> Gerber Files</h1>
         <GerberFiles uploadedFiles={printPcb.inputFiles} />
         <Button disabled={!printPcb.readyToProcessFiles} onClick={() => post("process/printPcb/_processFiles").success('Process Files triggered').send()}>Process Files</Button><br />
@@ -152,7 +153,7 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
         </React.Fragment>}
 
         {printPcb.status !== 'POSITION_1' && printPcb.status !== 'POSITION_2' ? null : <React.Fragment>
-        <p>{printPcb.userMessage}</p>
+            <p>{printPcb.userMessage}</p>
             <Button onClick={() => post("process/printPcb/_addPositionPoint").send()}>Add Positioning Point</Button>
             <div className="row">
                 <div className="col-md-6"><JoggingControls /></div>
@@ -163,18 +164,6 @@ function PrintPcb({ printPcb }: { printPcb: PrintPcbProcess }) {
             <SendGCode />
         </React.Fragment>}
     </React.Fragment>
-}
-
-interface LaserCalibrationProcess {
-    v1: number
-    v2: number
-}
-
-function LaserCalibration({ laserCalibration }: { laserCalibration: LaserCalibrationProcess }) {
-    return <div>
-        v1: {laserCalibration.v1} v2: {laserCalibration.v2} <br />
-        <Button onClick={() => post("process/laserCalibration/printPattern").send()}>Print Pattern</Button>
-    </div>;
 }
 
 type LaserHeightCalibrationStep = 'PREPARE' | 'EXPOSE_PATTERN' | 'SET_HEIGHT';
@@ -193,12 +182,19 @@ function LaserHeightCalibration({ process }: { process: LaserHeightCalibrationPr
     const heights = process.laserHeights === null ? null : process.laserHeights.map(x => '' + x).join(',');
     return <div>
         step: {process.currentStep}<br />
-        {process.currentStep !== 'PREPARE' ? null : <React.Fragment> <UseEdit<LaserHeightCalibrationProcess> url="process/laserHeightCalibration">{([p, edit]) => p === undefined ? null : <React.Fragment>
-            <Input type="number" label="Start Laser Height [mm]" value={'' + p.startHeight} onChange={p => edit.update({ startHeight: parseFloat(p) })} />
-            <Input type="number" label="End Laser Height [mm]" value={'' + p.endHeight} onChange={p => edit.update({ endHeight: parseFloat(p) })} />
-            <Input type="number" label="Number of heights to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
-            <Button onClick={() => edit.save()}>Save</Button>
-        </React.Fragment>}</UseEdit>
+        {process.currentStep !== 'PREPARE' ? null : <React.Fragment>
+            <p>The laser height calibration will expose parallel lines at the distance configured as laser width using different laser Z heights,
+                starting with the lowest configured height. After exposing, choose the Z height where the lines just touch (no gap).
+            </p>
+            <p>Use the camera to choose the bottom left corner of the exposed pattern</p>
+            <EditData<LaserHeightCalibrationProcess> url="process/laserHeightCalibration">
+                {([p, edit]) => p === undefined ? null : <React.Fragment>
+                    <Input type="number" label="Start Laser Height [mm]" value={'' + p.startHeight} onChange={p => edit.update({ startHeight: parseFloat(p) })} />
+                    <Input type="number" label="End Laser Height [mm]" value={'' + p.endHeight} onChange={p => edit.update({ endHeight: parseFloat(p) })} />
+                    <Input type="number" label="Number of heights to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
+                    <Button onClick={() => edit.save()}>Save</Button>
+                </React.Fragment>}
+            </EditData>
             <JoggingControls />
             <br /> heights: {heights}<br />
             <Button onClick={() => post("process/laserHeightCalibration/_exposePattern").send()}>Expose Pattern</Button>
@@ -223,7 +219,18 @@ function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCal
         step: {cameraCalibration.currentStep} <br />
         {
             cameraCalibration.currentStep !== 'MOVE_TO_ORIGIN' ? null : <React.Fragment>
-                <JoggingControls />
+                <p> The camera offset is calibrated by first exposing a cross, and then moving the crosshair of the camera
+                    exactly to the position of the cross.</p>
+                <p>First move the crosshair to the location where the cross should be exposed. This uses
+                    the offsets currently configured. If you configure this for the first time, just set
+                    the offset to 0 and position the laser, ignoring the camera position.
+                </p>
+                <Container fluid>
+                    <Row>
+                        <Col><JoggingControls /></Col>
+                        <Col><CameraView /></Col>
+                    </Row>
+                </Container>
                 <Button onClick={() => post("process/cameraCalibration/exposeCross").send()}>Expose Cross</Button>
             </React.Fragment>
         }{
@@ -243,7 +250,6 @@ function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCal
 
 interface Process {
     printPcb: PrintPcbProcess;
-    laserCalibration: LaserCalibrationProcess;
     laserHeightCalibration: LaserHeightCalibrationProcessPMod;
     cameraCalibration: CameraCalibrationProcess;
 }
@@ -256,9 +262,8 @@ export default function ProcessComponent() {
         <WithData<Process> url="process"
             refreshMs={1000}
             render={(process) => {
-                let { printPcb, laserCalibration, cameraCalibration, laserHeightCalibration } = process;
+                let { printPcb, cameraCalibration, laserHeightCalibration } = process;
                 if (printPcb !== null) return <PrintPcb printPcb={printPcb} />;
-                if (laserCalibration !== null) return <LaserCalibration laserCalibration={laserCalibration} />;
                 if (cameraCalibration !== null) return <CameraCalibration cameraCalibration={cameraCalibration} />;
                 if (laserHeightCalibration !== null) return <LaserHeightCalibration process={laserHeightCalibration} />;
 

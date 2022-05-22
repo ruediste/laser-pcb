@@ -9,13 +9,13 @@ interface EditFunctions<T> {
 }
 type UseEditResult<T> = [T | undefined, EditFunctions<T>];
 
-interface UseEditProps<T>{
+interface UseEditProps<T> {
     url?: string;
-    children: (args: UseEditResult<T>)=>ReactNode
+    children: (args: UseEditResult<T>) => ReactNode
 }
 
-export function UseEdit<T>(props: UseEditProps<T>){
-    const args=useEdit<T>(props.url);
+export function EditData<T>(props: UseEditProps<T>) {
+    const args = useEdit<T>(props.url);
     return <React.Fragment>{props.children(args)}</React.Fragment>
 }
 
