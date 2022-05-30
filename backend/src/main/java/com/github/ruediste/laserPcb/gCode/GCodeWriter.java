@@ -9,6 +9,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.github.ruediste.laserPcb.profile.Profile;
+
 public class GCodeWriter {
 	private List<String> gCodes = new ArrayList<>();
 	Double lastFeedG0;
@@ -146,6 +148,27 @@ public class GCodeWriter {
 
 	public GCodeWriter unitsMM() {
 		return add("G21");
+	}
+
+	/**
+	 * Set the fan speed
+	 * 
+	 * @param sValue value 0-255
+	 */
+	public GCodeWriter setFanSpeed(int sValue) {
+		return add("M106 S" + sValue);
+	}
+
+	public GCodeWriter fanOff() {
+		return add("M107");
+	}
+
+	public GCodeWriter laserOn(Profile profile) {
+		return setFanSpeed((int) (profile.laserIntensity * 255));
+	}
+
+	public GCodeWriter laserOff(Profile profile) {
+		return fanOff();
 	}
 
 	public void splitAndAdd(String gCodeSource) {

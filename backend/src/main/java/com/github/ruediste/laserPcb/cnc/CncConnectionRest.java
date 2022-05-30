@@ -132,10 +132,12 @@ public class CncConnectionRest {
 	@PostMapping("cncConnection/_setLaser")
 	void setLaser(@RequestParam boolean laserOn) {
 		Profile profile = profileRepo.getCurrent();
+		GCodeWriter gCode = new GCodeWriter();
 		if (laserOn)
-			connCtrl.getConnection().sendGCodeForJog(profile.laserOn);
+			gCode.laserOn(profile);
 		else
-			connCtrl.getConnection().sendGCodeForJog(profile.laserOff);
+			gCode.laserOff(profile);
+		gCode.getGCodes().forEach(connCtrl.getConnection()::sendGCodeForJog);
 	}
 
 	@PostMapping("cncConnection/_laserZ")

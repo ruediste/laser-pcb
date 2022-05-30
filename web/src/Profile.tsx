@@ -23,8 +23,7 @@ interface Profile {
     exposureFeed: number;
     fastMovementFeed: number;
 
-    laserOn: string;
-    laserOff: string;
+    laserIntensity: number;
     preExposeGCode: string;
 
     bedSizeX: number;
@@ -129,9 +128,7 @@ export default function ProfileComponent() {
                                 <Input type="number" label="Overlap between exposures (fraction of exposure width)" value={'' + profile.exposureOverlap} onChange={p => editProfile.update({ exposureOverlap: parseFloat(p) })} />
                             </Col>
                             <Col md>
-
-                                <Input type="text" label="Laser On" value={profile.laserOn} onChange={p => editProfile.update({ laserOn: p })} />
-                                <Input type="text" label="Laser Off" value={profile.laserOff} onChange={p => editProfile.update({ laserOff: p })} />
+                                <Input type="number" label="Laser Intensity [0..1]" comment="Intensity of the laser. 0 is off, 1 is 100%" value={'' + profile.laserIntensity} onChange={p => editProfile.update({ laserIntensity: parseFloat(p) })} />
                                 <Input type="textarea" label="Pre Expose GCode" value={profile.preExposeGCode} onChange={p => editProfile.update({ preExposeGCode: p })} />
                             </Col>
                         </Row>

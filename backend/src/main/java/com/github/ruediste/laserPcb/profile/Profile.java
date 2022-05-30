@@ -35,8 +35,10 @@ public class Profile extends EntityBase {
 	public int bedSizeX;
 	public int bedSizeY;
 
-	public String laserOn;
-	public String laserOff;
+	/**
+	 * Intensity of the laser, 0..1
+	 */
+	public double laserIntensity;
 
 	public String preExposeGCode;
 

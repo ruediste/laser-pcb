@@ -50,11 +50,11 @@ public class LaserHeightCalibrationService {
 			first = false;
 
 			// expose pair
-			gCode.add(profile.laserOn);
+			gCode.laserOn(profile);
 			gCode.g1(50., null);
 			gCode.g0(null, profile.exposureWidth);
 			gCode.g1(-50., null);
-			gCode.add(profile.laserOff);
+			gCode.laserOff(profile);
 		}
 
 		return gCode;

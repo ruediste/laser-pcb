@@ -192,16 +192,20 @@ function LaserHeightCalibration({ process }: { process: LaserHeightCalibrationPr
                     <Input type="number" label="Start Laser Height [mm]" value={'' + p.startHeight} onChange={p => edit.update({ startHeight: parseFloat(p) })} />
                     <Input type="number" label="End Laser Height [mm]" value={'' + p.endHeight} onChange={p => edit.update({ endHeight: parseFloat(p) })} />
                     <Input type="number" label="Number of heights to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
-                    <Button onClick={() => edit.save()}>Save</Button>
+                    <Button className="mt-3" onClick={() => edit.save()}>Apply</Button>
                 </React.Fragment>}
             </EditData>
-            <JoggingControls />
+            <Row>
+                <Col><JoggingControls /></Col>
+                <Col><CameraView /></Col>
+            </Row>
             <br /> heights: {heights}<br />
             <Button onClick={() => post("process/laserHeightCalibration/_exposePattern").send()}>Expose Pattern</Button>
         </React.Fragment>}
         {process.currentStep !== 'EXPOSE_PATTERN' ? null : <SendGCode />}
         {process.currentStep !== 'SET_HEIGHT' ? null : <React.Fragment>
-            <br /> heights: {heights}<br />
+            <p>Choose the laser height where the lines touch</p>
+            Heights: {heights}<br />
             <Input type="number" label="Set Laser Height [mm]" value={'' + z} onChange={p => setZ(parseFloat(p))} />
             <Button onClick={() => post("process/laserHeightCalibration/_setHeight").query({ laserHeight: '' + z }).error("Error while setting laser height").success("Laser Height Updated").send()}>Set Height</Button>
         </React.Fragment>}

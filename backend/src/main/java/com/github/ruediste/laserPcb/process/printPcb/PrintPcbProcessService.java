@@ -372,7 +372,7 @@ public class PrintPcbProcessService {
 				Coordinate transformed = new Coordinate();
 				transformation.transform(raw, transformed);
 				if (laserOn) {
-					gCodes.add(profile.laserOff);
+					gCodes.laserOff(profile);
 					laserOn = false;
 				}
 				gCodes.g0(transformed.x, transformed.y);
@@ -383,7 +383,7 @@ public class PrintPcbProcessService {
 				Coordinate transformed = new Coordinate();
 				transformation.transform(raw, transformed);
 				if (!laserOn) {
-					gCodes.add(profile.laserOn);
+					gCodes.laserOn(profile);
 					laserOn = true;
 				}
 				gCodes.g1(transformed.x, transformed.y);
@@ -392,7 +392,7 @@ public class PrintPcbProcessService {
 
 		data.buffers.forEach(moveGenerator::add);
 		moveGenerator.generateMoves(new Coordinate(0, 0));
-		gCodes.add(profile.laserOff);
+		gCodes.laserOff(profile);
 		return gCodes;
 	}
 
