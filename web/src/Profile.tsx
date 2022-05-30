@@ -129,6 +129,7 @@ export default function ProfileComponent() {
                             </Col>
                             <Col md>
                                 <Input type="number" label="Laser Intensity [0..1]" comment="Intensity of the laser. 0 is off, 1 is 100%" value={'' + profile.laserIntensity} onChange={p => editProfile.update({ laserIntensity: parseFloat(p) })} />
+                                <Button onClick={() => post("process/laserIntensityCalibration/_start").error("Error while starting calibration").success(() => navigate("/process")).send()}>Start Calibration</Button>
                                 <Input type="textarea" label="Pre Expose GCode" value={profile.preExposeGCode} onChange={p => editProfile.update({ preExposeGCode: p })} />
                             </Col>
                         </Row>

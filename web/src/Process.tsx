@@ -213,6 +213,53 @@ function LaserHeightCalibration({ process }: { process: LaserHeightCalibrationPr
     </div>;
 }
 
+type LaserIntensityCalibrationStep = 'PREPARE' | 'EXPOSE_PATTERN' | 'SET_INTENSITY';
+interface LaserIntensityCalibrationProcess {
+    currentStep: LaserIntensityCalibrationStep
+    minIntensity: number
+    maxIntensity: number
+    count: number
+}
+interface LaserIntensityCalibrationProcessPMod {
+    currentStep: LaserIntensityCalibrationStep
+    laserIntensities: number[]
+}
+function LaserIntensityCalibration({ process }: { process: LaserIntensityCalibrationProcessPMod }) {
+    const [intensity, setIntensity] = useState(0);
+    const intensities = process.laserIntensities === null ? null : process.laserIntensities.map(x => '' + x).join(',');
+    return <div>
+        step: {process.currentStep}<br />
+        {process.currentStep !== 'PREPARE' ? null : <React.Fragment>
+            <p>The laser intensity calibration will expose parallel lines at the distance configured as laser width using different laser Z intensities,
+                starting with the lowest configured intensity. After exposing, choose the intensity where the lines are just exposed entough after developing the photoresist.
+            </p>
+            <p>Use the camera to choose the bottom left corner of the exposed pattern</p>
+            <EditData<LaserIntensityCalibrationProcess> url="process/laserIntensityCalibration">
+                {([p, edit]) => p === undefined ? null : <React.Fragment>
+                    <Input type="number" label="Min Intensity [0..1]" value={'' + p.minIntensity} onChange={p => edit.update({ minIntensity: parseFloat(p) })} />
+                    <Input type="number" label="Max Intensity [0..1]" value={'' + p.maxIntensity} onChange={p => edit.update({ maxIntensity: parseFloat(p) })} />
+                    <Input type="number" label="Number of intensityes to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
+                    <Button className="mt-3" onClick={() => edit.save()}>Apply</Button>
+                </React.Fragment>}
+            </EditData>
+            <Row>
+                <Col><JoggingControls /></Col>
+                <Col><CameraView /></Col>
+            </Row>
+            <br /> heights: {intensities}<br />
+            <Button onClick={() => post("process/laserIntensityCalibration/_exposePattern").send()}>Expose Pattern</Button>
+        </React.Fragment>}
+        {process.currentStep !== 'EXPOSE_PATTERN' ? null : <SendGCode />}
+        {process.currentStep !== 'SET_INTENSITY' ? null : <React.Fragment>
+            <p>Choose the laser intensity which was developed correctly</p>
+            Intensity: {intensities}<br />
+            <Input type="number" label="Set Laser Intensity [0..1]" value={'' + intensity} onChange={p => setIntensity(parseFloat(p))} />
+            <Button onClick={() => post("process/laserIntensityCalibration/_setIntensity").query({ laserIntensity: '' + intensity }).error("Error while setting laser intensity").success("Laser Intensity Updated").send()}>Set Intensity</Button>
+        </React.Fragment>}
+
+    </div>;
+}
+
 
 interface CameraCalibrationProcess {
     currentStep: 'MOVE_TO_ORIGIN' | 'EXPOSE_CROSS' | 'POSITION_CAMERA';
@@ -255,6 +302,7 @@ function CameraCalibration({ cameraCalibration }: { cameraCalibration: CameraCal
 interface Process {
     printPcb: PrintPcbProcess;
     laserHeightCalibration: LaserHeightCalibrationProcessPMod;
+    laserIntensityCalibration: LaserIntensityCalibrationProcessPMod;
     cameraCalibration: CameraCalibrationProcess;
 }
 
@@ -266,11 +314,11 @@ export default function ProcessComponent() {
         <WithData<Process> url="process"
             refreshMs={1000}
             render={(process) => {
-                let { printPcb, cameraCalibration, laserHeightCalibration } = process;
+                let { printPcb, cameraCalibration, laserHeightCalibration, laserIntensityCalibration } = process;
                 if (printPcb !== null) return <PrintPcb printPcb={printPcb} />;
                 if (cameraCalibration !== null) return <CameraCalibration cameraCalibration={cameraCalibration} />;
                 if (laserHeightCalibration !== null) return <LaserHeightCalibration process={laserHeightCalibration} />;
-
+                if (laserIntensityCalibration !== null) return <LaserIntensityCalibration process={laserIntensityCalibration} />;
                 return null;
             }} />
     </React.Fragment>;

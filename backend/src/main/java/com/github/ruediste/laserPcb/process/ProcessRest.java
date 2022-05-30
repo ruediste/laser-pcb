@@ -13,6 +13,9 @@ import com.github.ruediste.laserPcb.process.cameraCalibration.CameraCalibrationP
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcess;
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationProcessPMod;
 import com.github.ruediste.laserPcb.process.laserHeightCalibration.LaserHeightCalibrationService;
+import com.github.ruediste.laserPcb.process.laserIntensityCalibration.LaserIntensityCalibrationProcess;
+import com.github.ruediste.laserPcb.process.laserIntensityCalibration.LaserIntensityCalibrationProcessPMod;
+import com.github.ruediste.laserPcb.process.laserIntensityCalibration.LaserIntensityCalibrationService;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.InputFileStatus;
 import com.github.ruediste.laserPcb.process.printPcb.PrintPcbProcess.PcbLayer;
@@ -42,6 +45,9 @@ public class ProcessRest {
 	@Autowired
 	LaserHeightCalibrationService laserHeightCalibrationService;
 
+	@Autowired
+	LaserIntensityCalibrationService laserIntensityCalibrationService;
+
 	@GetMapping("process")
 	ProcessPMod getProcess() {
 		Process process = repo.get();
@@ -54,6 +60,8 @@ public class ProcessRest {
 			processPMod.cameraCalibration = toPMod(process.cameraCalibration);
 		if (process.laserHeightCalibration != null)
 			processPMod.laserHeightCalibration = toPMod(process.laserHeightCalibration);
+		if (process.laserIntensityCalibration != null)
+			processPMod.laserIntensityCalibration = toPMod(process.laserIntensityCalibration);
 		return processPMod;
 	}
 
@@ -106,6 +114,13 @@ public class ProcessRest {
 		LaserHeightCalibrationProcessPMod pMod = new LaserHeightCalibrationProcessPMod();
 		pMod.currentStep = laserHeightCalibration.currentStep;
 		pMod.laserHeights = laserHeightCalibrationService.getLaserHeights(laserHeightCalibration);
+		return pMod;
+	}
+
+	private LaserIntensityCalibrationProcessPMod toPMod(LaserIntensityCalibrationProcess laserIntensityCalibration) {
+		var pMod = new LaserIntensityCalibrationProcessPMod();
+		pMod.currentStep = laserIntensityCalibration.currentStep;
+		pMod.laserIntensities = laserIntensityCalibrationService.getLaserIntensities(laserIntensityCalibration);
 		return pMod;
 	}
 

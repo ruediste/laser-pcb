@@ -164,7 +164,12 @@ public class GCodeWriter {
 	}
 
 	public GCodeWriter laserOn(Profile profile) {
-		return setFanSpeed((int) (profile.laserIntensity * 255));
+		double laserIntensity = profile.laserIntensity;
+		return laserOn(profile, laserIntensity);
+	}
+
+	public GCodeWriter laserOn(Profile profile, double laserIntensity) {
+		return setFanSpeed((int) (laserIntensity * 255));
 	}
 
 	public GCodeWriter laserOff(Profile profile) {
