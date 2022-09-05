@@ -20,8 +20,8 @@ public class LaserIntensityCalibrationProcess {
 
 	public LaserIntensityCalibrationStep currentStep = LaserIntensityCalibrationStep.PREPARE;
 
-	public double minIntensity;
-	public double maxIntensity;
+	public int minIntensity;
+	public int maxIntensity;
 	public int count;
 
 }

@@ -91,7 +91,7 @@ export function JoggingControlsNoLoad({ state }: { state: SerialConnections }) {
         </table>
 
         {state.serialConnected ? <div>X:{'' + state.x} Y:{'' + state.y} Z: {'' + state.z}</div> : null}
-    </div> : <div> <Badge bg="warn">Disconnected</Badge> </div>;
+    </div> : <div> <Badge bg="danger">Disconnected</Badge> </div>;
 }
 
 export default function JoggingControls() {

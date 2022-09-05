@@ -31,12 +31,13 @@ public class LaserHeightCalibrationService {
 		Profile profile = profileRepo.getCurrent();
 
 		var gCode = new GCodeWriter();
+		gCode.splitAndAdd(profile.preExposeGCode);
 		gCode.add("G21"); // set units to millimeters
 		gCode.g0(profile.fastMovementFeed);
 		gCode.g1(profile.exposureFeed);
 
 		gCode.relativePositioning();
-		gCode.g0(profile.cameraOffsetX, profile.cameraOffsetY); // move by the current camera offset
+		gCode.g0(-profile.cameraOffsetX, -profile.cameraOffsetY); // move by the current camera offset
 
 		boolean first = true;
 		List<Double> laserHeights = getLaserHeights(process);

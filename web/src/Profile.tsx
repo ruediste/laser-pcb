@@ -110,7 +110,7 @@ export default function ProfileComponent() {
                                     if (p.length > 0)
                                         editProfile.update({ preferredAlignmentCorner: p[0].id });
                                 }} labelField="id" valueField="id" />
-                                <Input type="number" label="Border around the board, from the reference point [mm]" value={'' + profile.boardBorder} onChange={p => editProfile.update({ boardBorder: parseInt(p) })} />
+                                <Input type="number" label="Border around the board, from the reference point [mm]" value={'' + profile.boardBorder} onChange={p => editProfile.update({ boardBorder: parseFloat(p) })} />
                             </Col>
                         </Row>
                     </Card.Body>
@@ -128,7 +128,9 @@ export default function ProfileComponent() {
                                 <Input type="number" label="Overlap between exposures (fraction of exposure width)" value={'' + profile.exposureOverlap} onChange={p => editProfile.update({ exposureOverlap: parseFloat(p) })} />
                             </Col>
                             <Col md>
-                                <Input type="number" label="Laser Intensity [0..1]" comment="Intensity of the laser. 0 is off, 1 is 100%" value={'' + profile.laserIntensity} onChange={p => editProfile.update({ laserIntensity: parseFloat(p) })} />
+                                <Input type="number" label="Laser Intensity [0..255]" comment="Intensity of the laser. 0 is off, 255 is 100%"  
+                                step={1} min={0} max={255}
+                                value={'' + profile.laserIntensity} onChange={p => editProfile.update({ laserIntensity: parseInt(p) })} />
                                 <Button onClick={() => post("process/laserIntensityCalibration/_start").error("Error while starting calibration").success(() => navigate("/process")).send()}>Start Calibration</Button>
                                 <Input type="textarea" label="Pre Expose GCode" value={profile.preExposeGCode} onChange={p => editProfile.update({ preExposeGCode: p })} />
                             </Col>

@@ -236,8 +236,12 @@ function LaserIntensityCalibration({ process }: { process: LaserIntensityCalibra
             <p>Use the camera to choose the bottom left corner of the exposed pattern</p>
             <EditData<LaserIntensityCalibrationProcess> url="process/laserIntensityCalibration">
                 {([p, edit]) => p === undefined ? null : <React.Fragment>
-                    <Input type="number" label="Min Intensity [0..1]" value={'' + p.minIntensity} onChange={p => edit.update({ minIntensity: parseFloat(p) })} />
-                    <Input type="number" label="Max Intensity [0..1]" value={'' + p.maxIntensity} onChange={p => edit.update({ maxIntensity: parseFloat(p) })} />
+                    <Input type="number" label="Min Intensity [0..255]" 
+                        step={1} min={0} max={255}
+                        value={'' + p.minIntensity} onChange={p => edit.update({ minIntensity: parseFloat(p) })} />
+                    <Input type="number" label="Max Intensity [0..255]" 
+                        step={1} min={0} max={255}
+                        value={'' + p.maxIntensity} onChange={p => edit.update({ maxIntensity: parseFloat(p) })} />
                     <Input type="number" label="Number of intensityes to expose" value={'' + p.count} onChange={p => edit.update({ count: parseInt(p) })} />
                     <Button className="mt-3" onClick={() => edit.save()}>Apply</Button>
                 </React.Fragment>}

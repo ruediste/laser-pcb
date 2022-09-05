@@ -21,31 +21,36 @@ export function InputCheck(props: InputCheckProps) {
     </div>
 }
 
-interface InputProps {
-    type: 'number' | 'text' | 'textarea',
+type InputProps = {
     label: string,
     value: string,
     comment?: string,
     rows?: number,
     onChange: (value: string) => void
-}
+} & ( 
+    {type: 'number', step?: number, min?: number, max?: number}
+    | {type: 'text'}
+    | {type: 'textarea', rows?: number}
+    )
 
-export function Input(props: InputProps) {
+
+
+export function Input({type, label, value, comment, rows, onChange, ...others}: InputProps) {
     const id = useUniqueId();
-    if (props.type === 'textarea')
+    if (type === 'textarea')
         return <div className="form-group">
-            <label htmlFor={id}>{props.label}</label>
-            <textarea className="form-control" id={id} onChange={e => props.onChange(e.target.value)} value={props.value}>
+            <label htmlFor={id}>{label}</label>
+            <textarea className="form-control" id={id} onChange={e => onChange(e.target.value)} value={value} {...others}>
             </textarea>
-            {props.comment === undefined ? null :
-                <small className="form-text text-muted">{props.comment}</small>
+            {comment === undefined ? null :
+                <small className="form-text text-muted">{comment}</small>
             }
         </div>;
     return <div className="form-group">
-        <label htmlFor={id}>{props.label}</label>
-        <input type={props.type} className="form-control" id={id} value={props.value} onChange={e => props.onChange(e.target.value)} />
-        {props.comment === undefined ? null :
-            <small className="form-text text-muted">{props.comment}</small>
+        <label htmlFor={id}>{label}</label>
+        <input type={type} className="form-control" id={id} value={value} onChange={e => onChange(e.target.value)} {...others}/>
+        {comment === undefined ? null :
+            <small className="form-text text-muted">{comment}</small>
         }
     </div>;
 }

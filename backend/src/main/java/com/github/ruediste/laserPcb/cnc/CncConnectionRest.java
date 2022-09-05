@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -134,7 +135,7 @@ public class CncConnectionRest {
 		Profile profile = profileRepo.getCurrent();
 		GCodeWriter gCode = new GCodeWriter();
 		if (laserOn)
-			gCode.laserOn(profile);
+			gCode.laserOnJog(profile);
 		else
 			gCode.laserOff(profile);
 		gCode.getGCodes().forEach(connCtrl.getConnection()::sendGCodeForJog);
@@ -159,5 +160,13 @@ public class CncConnectionRest {
 	void cameraZ() {
 		Profile profile = profileRepo.getCurrent();
 		sendGoToZ(profile.cameraZ, profile);
+	}
+
+	@PostMapping("cncConnection/_script")
+	void script(@RequestBody String script) {
+		CncConnection conn = connCtrl.getConnection();
+		var gCode = new GCodeWriter();
+		gCode.splitAndAdd(script);
+		conn.sendGCodes(gCode);
 	}
 }

@@ -16,6 +16,7 @@ public class GCodeWriter {
 	Double lastFeedG0;
 	Double lastFeedG1;
 	Double lastFeed;
+	Integer laserIntensity;
 
 	public List<String> getGCodes() {
 		return gCodes;
@@ -71,6 +72,7 @@ public class GCodeWriter {
 			gCode += " F" + formatFeed(f);
 			lastFeed = f;
 		}
+		gCode += " S0";
 		gCodes.add(gCode);
 		return this;
 	}
@@ -117,6 +119,11 @@ public class GCodeWriter {
 			gCode += " F" + formatFeed(f);
 			lastFeed = f;
 		}
+
+		if (laserIntensity != null) {
+			gCode += " S" + laserIntensity;
+		}
+
 		gCodes.add(gCode);
 		return this;
 	}
@@ -163,17 +170,26 @@ public class GCodeWriter {
 		return add("M107");
 	}
 
-	public GCodeWriter laserOn(Profile profile) {
-		double laserIntensity = profile.laserIntensity;
-		return laserOn(profile, laserIntensity);
+	public GCodeWriter laserOnJog(Profile profile) {
+		return add("M3S" + profile.laserIntensity);
 	}
 
-	public GCodeWriter laserOn(Profile profile, double laserIntensity) {
-		return setFanSpeed((int) (laserIntensity * 255));
+	public GCodeWriter laserOn(Profile profile) {
+		return laserOn(profile, profile.laserIntensity);
+	}
+
+	public GCodeWriter laserOn(Profile profile, int laserIntensity) {
+		return laserOn(laserIntensity);
+	}
+
+	public GCodeWriter laserOn(int sValue) {
+		laserIntensity = sValue;
+		return add("M3IS0");
 	}
 
 	public GCodeWriter laserOff(Profile profile) {
-		return fanOff();
+		laserIntensity = null;
+		return add("M5I");
 	}
 
 	public void splitAndAdd(String gCodeSource) {

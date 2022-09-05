@@ -16,13 +16,29 @@ public class LaserIntensityCalibrationService {
 	@Autowired
 	ProfileRepository profileRepo;
 
-	public List<Double> getLaserIntensities(LaserIntensityCalibrationProcess process) {
+	public List<Integer> getLaserIntensities(LaserIntensityCalibrationProcess process) {
 		if (process.count < 2)
 			return null;
-		List<Double> result = new ArrayList<>();
-		double f = Math.pow(process.maxIntensity / process.minIntensity, 1. / (process.count - 1));
+		List<Integer> result = new ArrayList<>();
+		double f = Math.pow(process.maxIntensity / (double) process.minIntensity, 1. / (process.count - 1));
+		int intensity = process.minIntensity;
 		for (int i = 0; i < process.count; i++) {
-			result.add(Math.round(1000 * process.minIntensity * Math.pow(f, i)) / 1000.);
+			result.add(intensity);
+
+			// calculate next step
+			int newIntensity = (int) (process.minIntensity * Math.pow(f, i + 1));
+			if (newIntensity <= intensity) // make sure intensity always increases
+				newIntensity = intensity + 1;
+
+			// check if we reached the max intensity
+			if (newIntensity >= process.maxIntensity) {
+
+				// add the max intensity if it has not been added before
+				if (intensity < process.maxIntensity && result.size() < process.count)
+					result.add(process.maxIntensity);
+				break;
+			}
+			intensity = newIntensity;
 		}
 		return result;
 	}
@@ -32,6 +48,7 @@ public class LaserIntensityCalibrationService {
 		Profile profile = profileRepo.getCurrent();
 
 		var gCode = new GCodeWriter();
+		gCode.splitAndAdd(profile.preExposeGCode);
 		gCode.add("G21"); // set units to millimeters
 		gCode.g0(profile.fastMovementFeed);
 		gCode.g1(profile.exposureFeed);
@@ -40,11 +57,11 @@ public class LaserIntensityCalibrationService {
 		gCode.g0(null, null, profile.laserZ); // move to laser z
 
 		gCode.relativePositioning();
-		gCode.g0(profile.cameraOffsetX, profile.cameraOffsetY); // move by the current camera offset
+		gCode.g0(-profile.cameraOffsetX, -profile.cameraOffsetY); // move by the current camera offset
 
 		boolean first = true;
-		List<Double> laserIntensities = getLaserIntensities(process);
-		for (double laserIntensity : laserIntensities) {
+		var laserIntensities = getLaserIntensities(process);
+		for (var laserIntensity : laserIntensities) {
 			if (!first)
 				gCode.g0(null, profile.exposureWidth * 5); // leave a gap between exposure pairs
 			first = false;

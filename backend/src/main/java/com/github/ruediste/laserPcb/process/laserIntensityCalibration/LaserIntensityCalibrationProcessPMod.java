@@ -6,6 +6,6 @@ import com.github.ruediste.laserPcb.process.laserIntensityCalibration.LaserInten
 
 public class LaserIntensityCalibrationProcessPMod {
 
-	public List<Double> laserIntensities;
+	public List<Integer> laserIntensities;
 	public LaserIntensityCalibrationStep currentStep;
 }

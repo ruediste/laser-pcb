@@ -40,8 +40,8 @@ public class LaserIntensityCalibrationRest {
 	void start() {
 		Profile profile = profileRepo.getCurrent();
 		var calibration = new LaserIntensityCalibrationProcess();
-		calibration.maxIntensity = Math.min(1, profile.laserZ * 1.5);
-		calibration.minIntensity = calibration.maxIntensity / 1.5 / 1.5;
+		calibration.maxIntensity = (int) Math.min(255, profile.laserIntensity * 1.5);
+		calibration.minIntensity = (int) (calibration.maxIntensity / 1.5 / 1.5);
 		calibration.count = 5;
 		processAppController.update(p -> p.clear().laserIntensityCalibration = calibration);
 	}
@@ -76,7 +76,7 @@ public class LaserIntensityCalibrationRest {
 	}
 
 	@PostMapping("process/laserIntensityCalibration/_setIntensity")
-	void _setHeight(@RequestParam Double laserIntensity) {
+	void setIntensity(@RequestParam int laserIntensity) {
 		Profile profile = profileRepo.getCurrent();
 		profile.laserIntensity = laserIntensity;
 		profileRepo.save(profile);
