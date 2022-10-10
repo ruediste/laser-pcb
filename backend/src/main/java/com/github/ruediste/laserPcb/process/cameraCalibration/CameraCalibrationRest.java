@@ -41,11 +41,12 @@ public class CameraCalibrationRest {
 	@PostMapping("process/cameraCalibration/exposeCross")
 	void exposeCross() {
 		CncState state = connCtrl.getConnection().getState();
+		Profile profile = profileRepo.getCurrent();
 		processAppController.update(p -> {
 			CameraCalibrationProcess cameraCalibration = p.cameraCalibration;
 			cameraCalibration.currentStep = CameraCalibrationStep.EXPOSE_CROSS;
-			cameraCalibration.crossX = state.x + 5;
-			cameraCalibration.crossY = state.y;
+			cameraCalibration.crossX = state.x-profile.cameraOffsetX;
+			cameraCalibration.crossY = state.y-profile.cameraOffsetY;
 		});
 		ctrl.sendGCodes(service.buildExposeCrossGCode()).thenRun(() -> processAppController
 				.update(p -> p.cameraCalibration.currentStep = CameraCalibrationStep.POSITION_CAMERA));

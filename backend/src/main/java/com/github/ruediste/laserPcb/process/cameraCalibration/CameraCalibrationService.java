@@ -26,7 +26,7 @@ public class CameraCalibrationService {
 
 		gCode.relativePositioning();
 
-		gCode.g0(profile.cameraOffsetX, profile.cameraOffsetY); // move by the current camera offset
+		gCode.g0(-profile.cameraOffsetX - 5, -profile.cameraOffsetY); // move by the current camera offset
 
 		gCode.laserOn(profile);
 		gCode.g1(10., null);
@@ -40,8 +40,8 @@ public class CameraCalibrationService {
 		gCode.add("G2 Y-10 J-5");
 		gCode.laserOff(profile);
 
-		gCode.g0(-profile.cameraOffsetX - 5, -profile.cameraOffsetY + 5); // move camera back over cross just exposed
-																			// (if the offset was already correct)
+		gCode.g0(profile.cameraOffsetX, profile.cameraOffsetY + 5); // move camera back over cross just exposed
+																		// (if the offset was already correct)
 		gCode.absolutePositioning();
 		gCode.g0(profile.cameraZ);
 		return gCode;
